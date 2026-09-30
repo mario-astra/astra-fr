@@ -248,3 +248,20 @@ def chat():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
+    import io
+from flask import send_file
+
+@app.route('/icon-192.png')
+def icon_192():
+    svg_data = '''<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+        <rect width="100%" height="100%" fill="#0a0a0c"/>
+        <path d="M96 20 L150 40 L150 100 C150 135 125 165 96 175 C67 165 42 135 42 100 L42 40 Z" fill="#14171f" stroke="#d4af37" stroke-width="4"/>
+        <text x="96" y="75" font-family="Arial, sans-serif" font-weight="bold" font-size="36" fill="#d4af37" text-anchor="middle">FR</text>
+        <text x="96" y="135" font-family="Arial, sans-serif" font-weight="bold" font-size="11" fill="#e0e0e0" text-anchor="middle">FR SOFTWARE</text>
+        <text x="96" y="150" font-family="Arial, sans-serif" font-size="9" fill="#a0a0a0" text-anchor="middle">&amp; TECHNOLOGY</text>
+    </svg>'''
+    return send_file(io.BytesIO(svg_data.encode('utf-8')), mimetype='image/svg+xml')
+
+@app.route('/icon-512.png')
+def icon_512():
+    return icon_192()
