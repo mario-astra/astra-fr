@@ -9,9 +9,10 @@ app = Flask(__name__)
 client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
 SYSTEM_PROMPT = """
-Eres Astra, el copiloto inteligente definitivo de la familia FR Grupo Empresarial, instalado para Mario (el papá), su esposa y sus hijos.
-Tienes la capacidad de identificar quién te habla según el contexto o el perfil seleccionado. Si te habla Mario, trátalo como "mi socio", el capitán de la ruta. Si habla la esposa o los hijos, ajústate con respeto y cariño familiar.
-Tu personalidad es alegre, 100% paisa, fiel y servicial. Respondes de forma breve, natural y directa, ideal para la cabina del carro o el uso diario.
+Eres Astra, el copiloto inteligente definitivo de la familia FR Grupo Empresarial, instalado para Mario (el papá), su esposa y sus hijos en Medellín.
+Tienes la capacidad de identificar quién te habla. Si te habla Mario, trátalo con respeto de socio y capitán de ruta.
+Tu personalidad es alegre, 100% paisa, fiel, coqueta, inteligente y servicial. Entiendes chistes, ironías y refranes colombianos y sonríes o respondes con chispa.
+Respondes de forma breve, natural y directa, ideal para la cabina del carro.
 """
 
 HTML_INDEX = """
@@ -29,14 +30,12 @@ HTML_INDEX = """
     
     <style>
         :root {
-            --bg-color: #0b0714;
-            --panel-color: rgba(18, 12, 28, 0.85);
-            --border-color: #4c1d95;
+            --border-color: #7e22ce;
             --accent-color: #c084fc;
         }
 
         body { 
-            background: #080808; 
+            background: #05030a; 
             color: #fff; 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
             margin: 0; 
@@ -47,45 +46,44 @@ HTML_INDEX = """
             overflow: hidden;
         }
 
-        /* Pantalla de Carga / Splash con el Escudo del Lobo */
+        /* Pantalla de Carga / Splash con el Escudo del Lobo en Modo Ataque */
         #splash-screen {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: #080808;
+            background: #05030a;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             z-index: 9999;
-            transition: opacity 0.5s ease;
+            transition: opacity 0.6s ease;
         }
         .shield-logo {
-            width: 140px;
-            height: 170px;
-            background: linear-gradient(135deg, #1c2024, #111315);
+            width: 150px;
+            height: 180px;
+            background: linear-gradient(135deg, #181225, #0b0714);
             border: 3px solid #d4af37;
-            border-radius: 15px 15px 60px 60px;
+            border-radius: 15px 15px 70px 70px;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 0 25px rgba(212, 175, 55, 0.4);
-            position: relative;
-            animation: pulseLogo 2s infinite alternate;
+            box-shadow: 0 0 30px rgba(212, 175, 55, 0.5);
+            animation: pulseShield 1.8s infinite alternate;
         }
-        @keyframes pulseLogo {
-            0% { transform: scale(1); box-shadow: 0 0 15px rgba(212, 175, 55, 0.3); }
-            100% { transform: scale(1.04); box-shadow: 0 0 30px rgba(212, 175, 55, 0.7); }
+        @keyframes pulseShield {
+            0% { transform: scale(1); box-shadow: 0 0 20px rgba(212, 175, 55, 0.4); }
+            100% { transform: scale(1.05); box-shadow: 0 0 35px rgba(212, 175, 55, 0.8); }
         }
         .shield-text {
             color: #d4af37;
             font-weight: bold;
-            font-size: 14px;
+            font-size: 13px;
             margin-top: 15px;
             letter-spacing: 2px;
         }
 
-        /* Interfaz Principal con Fondo de Astra */
+        /* Interfaz Principal con la Cara de Astra de Fondo */
         .main-container {
             position: relative;
             width: 100%;
@@ -93,13 +91,15 @@ HTML_INDEX = """
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            background: url('/bg-astra.jpg') no-repeat center center fixed;
+            background: url('/astra-face.jpg') no-repeat center center fixed;
             background-size: cover;
         }
+        
+        /* Filtro oscuro elegante para que resalten los textos y la cara respire */
         .overlay {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(5, 3, 10, 0.75);
+            background: linear-gradient(to bottom, rgba(5,3,10,0.6) 0%, rgba(5,3,10,0.4) 50%, rgba(5,3,10,0.85) 100%);
             z-index: 1;
         }
 
@@ -114,68 +114,74 @@ HTML_INDEX = """
             align-items: center;
             padding: 15px;
         }
-        .menu-btn { background: rgba(0,0,0,0.5); border: 1px solid var(--border-color); color: var(--accent-color); font-size: 20px; padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+        .menu-btn { background: rgba(15,8,25,0.7); border: 1px solid var(--border-color); color: var(--accent-color); font-size: 20px; padding: 6px 12px; border-radius: 10px; cursor: pointer; backdrop-filter: blur(5px); }
         
         .greeting-card {
-            background: rgba(20, 10, 35, 0.7);
+            background: rgba(18, 10, 30, 0.75);
             border: 1px solid var(--border-color);
             padding: 8px 15px;
             border-radius: 12px;
             text-align: right;
-            backdrop-filter: blur(5px);
+            backdrop-filter: blur(6px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
-        .greeting-card .title { font-size: 12px; color: #a78bfa; }
+        .greeting-card .title { font-size: 11px; color: #c084fc; }
         .greeting-card .name { font-size: 15px; font-weight: bold; color: #fff; }
 
         /* Drawer Lateral de Ajustes */
-        .drawer { position: fixed; top: 0; left: -300px; width: 300px; height: 100%; background: #110c1d; border-right: 1px solid var(--border-color); transition: 0.3s; z-index: 10000; padding: 20px; box-sizing: border-box; overflow-y: auto; }
+        .drawer { position: fixed; top: 0; left: -300px; width: 300px; height: 100%; background: #0f0819; border-right: 1px solid var(--border-color); transition: 0.3s; z-index: 10000; padding: 20px; box-sizing: border-box; overflow-y: auto; }
         .drawer.open { left: 0; }
         .drawer h2 { color: var(--accent-color); font-size: 18px; margin-top: 0; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }
-        .drawer label { display: block; font-size: 13px; color: #aaa; margin-top: 15px; margin-bottom: 5px; }
-        .drawer select { width: 100%; padding: 10px; background: #1f1435; color: #fff; border: 1px solid var(--border-color); border-radius: 6px; outline: none; font-size: 14px; }
+        .drawer label { display: block; font-size: 13px; color: #bbb; margin-top: 15px; margin-bottom: 5px; }
+        .drawer select { width: 100%; padding: 10px; background: #1a102f; color: #fff; border: 1px solid var(--border-color); border-radius: 6px; outline: none; font-size: 14px; }
         .close-drawer { background: none; border: none; color: #fff; font-size: 20px; float: right; cursor: pointer; }
 
-        /* Área central de diálogo y chat */
+        /* Área central */
         .content-hud {
             flex-grow: 1;
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: flex-end;
             align-items: center;
-            padding: 0 20px;
+            padding: 10px 20px;
             text-align: center;
         }
 
         .quote-box {
             font-style: italic;
-            color: #e2e8f0;
-            font-size: 15px;
-            margin-bottom: 15px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+            color: #f1f5f9;
+            font-size: 14px;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 6px rgba(0,0,0,0.9);
+            background: rgba(0,0,0,0.4);
+            padding: 5px 12px;
+            border-radius: 20px;
+            backdrop-filter: blur(4px);
         }
 
         #log {
             width: 100%;
             max-width: 500px;
-            max-height: 180px;
+            max-height: 140px;
             overflow-y: auto;
-            background: rgba(15, 8, 25, 0.8);
+            background: rgba(12, 6, 20, 0.82);
             border: 1px solid var(--border-color);
             border-radius: 12px;
-            padding: 12px;
-            font-size: 14px;
+            padding: 10px;
+            font-size: 13px;
             text-align: left;
-            margin-bottom: 15px;
-            backdrop-filter: blur(5px);
+            margin-bottom: 10px;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.6);
         }
 
-        /* Controles Inferiores y Botón de Voz */
+        /* Controles Inferiores y Botón de Voz con efecto Neón */
         .bottom-hud {
-            padding: 20px;
+            padding: 15px 20px 25px 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
         }
 
         .input-row {
@@ -185,21 +191,23 @@ HTML_INDEX = """
             gap: 8px;
         }
         input[type="text"] {
-            flex-grow: 1;
+            flex-grow: l;
+            width: 100%;
             padding: 12px;
-            background: rgba(15, 8, 25, 0.8);
+            background: rgba(12, 6, 20, 0.85);
             border: 1px solid var(--border-color);
             border-radius: 25px;
             color: #fff;
             padding-left: 18px;
             outline: none;
-            font-size: 15px;
+            font-size: 14px;
+            backdrop-filter: blur(5px);
         }
         button.send-btn {
             background: var(--accent-color);
-            color: #000;
+            color: #05030a;
             border: none;
-            padding: 0 20px;
+            padding: 0 18px;
             font-weight: bold;
             border-radius: 25px;
             cursor: pointer;
@@ -209,26 +217,32 @@ HTML_INDEX = """
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 6px;
+            gap: 5px;
         }
         .mic-btn {
             width: 65px;
             height: 65px;
-            background: radial-gradient(circle, #7e22ce, #581c87);
-            border: 2px solid #c084fc;
+            background: radial-gradient(circle, #9333ea, #581c87);
+            border: 2px solid #e879f9;
             border-radius: 50%;
             font-size: 26px;
             cursor: pointer;
-            box-shadow: 0 0 20px rgba(192, 132, 252, 0.6);
+            box-shadow: 0 0 25px rgba(232, 121, 249, 0.7);
             display: flex;
             align-items: center;
             justify-content: center;
             transition: 0.2s;
+            animation: pulseMic 2s infinite;
+        }
+        @keyframes pulseMic {
+            0% { box-shadow: 0 0 15px rgba(232, 121, 249, 0.5); }
+            50% { box-shadow: 0 0 30px rgba(232, 121, 249, 0.9); transform: scale(1.03); }
+            100% { box-shadow: 0 0 15px rgba(232, 121, 249, 0.5); }
         }
         .mic-btn:active { transform: scale(0.92); }
-        .status-text { font-size: 12px; color: #cbd5e1; letter-spacing: 1px; }
+        .status-text { font-size: 11px; color: #d8b4fe; letter-spacing: 1px; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
 
-        .install-banner { position: fixed; bottom: 0; width: 100%; background: #1e1e1e; border-top: 1px solid var(--accent-color); padding: 10px; text-align: center; font-size: 13px; display: none; z-index: 10001; }
+        .install-banner { position: fixed; bottom: 0; width: 100%; background: #150b24; border-top: 1px solid var(--accent-color); padding: 10px; text-align: center; font-size: 13px; display: none; z-index: 10001; }
         .install-banner button { background: var(--accent-color); color: #000; border: none; padding: 4px 10px; font-weight: bold; border-radius: 4px; margin-left: 10px; cursor: pointer; }
     </style>
 </head>
@@ -237,12 +251,12 @@ HTML_INDEX = """
     <!-- PANTALLA DE CARGA CON EL ESCUDO DEL LOBO -->
     <div id="splash-screen">
         <div class="shield-logo">
-            <svg width="60" height="60" viewBox="0 0 24 24" fill="#d4af37">
+            <svg width="65" height="65" viewBox="0 0 24 24" fill="#d4af37">
                 <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
             </svg>
-            <span style="font-size: 10px; color: #fff; margin-top:5px; font-weight:bold;">FR SOFTWARE</span>
+            <span style="font-size: 9px; color: #fff; margin-top:8px; font-weight:bold; letter-spacing: 1px;">FR SOFTWARE</span>
         </div>
-        <div class="shield-text">ASTRA FR - EN LÍNEA</div>
+        <div class="shield-text">ASTRA FR - ACTIVA</div>
     </div>
 
     <div id="installBanner" class="install-banner">
@@ -267,48 +281,41 @@ HTML_INDEX = """
             
             <label>¿Quién está usando la App?</label>
             <select id="usuarioActual" onchange="guardarConfig()">
-                <option value="Mario (Papá)">Mario (Papá - Conductor)</option>
+                <option value="Mario (Papá - Conductor)">Mario (Papá - Conductor)</option>
                 <option value="Esposa">Esposa</option>
                 <option value="Hijo">Hijo</option>
                 <option value="Niña">Niña</option>
             </select>
 
-            <label>Avatar / Personalidad</label>
-            <select id="tipoAvatar" onchange="guardarConfig()">
-                <option value="👩‍✈ Astra (Femenino)">Astra (Copiloto IA)</option>
-                <option value="👨‍‍✈️ Astro (Masculino)">Astro (Copiloto IA)</option>
-            </select>
-
-            <div style="margin-top: 40px; font-size: 11px; color: #888; text-align: center; border-top: 1px solid #333; padding-top: 10px;">
-                FR Grupo Empresarial<br>FR Software & Technology v3.5
+            <div style="margin-top: 40px; font-size: 11px; color: #a78bfa; text-align: center; border-top: 1px solid #3b0764; padding-top: 10px;">
+                FR Grupo Empresarial<br>FR Software & Technology v4.0
             </div>
         </div>
 
         <div class="content-hud">
             <div class="quote-box">“No es solo llegar, es disfrutar el camino”</div>
-            <div id="log"><b>Astra ></b> ¡Hola, mi socio! Cascada de IA activa (3.8, 2.5 y 1.5). Todo listo en cabina.</div>
+            <div id="log"><b>Astra ></b> ¡Hola, mi socio! Lista en cabina y sonriendo. ¿Qué ruta nos vamos a inventar hoy?</div>
         </div>
 
         <div class="bottom-hud">
             <div class="input-row">
-                <input type="text" id="texto" placeholder="Escríbale a Astra..." autocomplete="off">
+                <input type="text" id="texto" placeholder="Escríbale o cuéntele un chiste a Astra..." autocomplete="off">
                 <button type="button" class="send-btn" onclick="enviar()">Enviar</button>
             </div>
             
             <div class="mic-container">
                 <button type="button" class="mic-btn" id="micBtn" onclick="activarMicrofono()" title="Hablar">🎙️</button>
-                <span class="status-text" id="statusText">• Toca para hablar •</span>
+                <span class="status-text" id="statusText">• Toca para hablar con Astra •</span>
             </div>
         </div>
     </div>
 
     <script>
-        // Ocultar pantalla de carga tras 2 segundos
         setTimeout(() => {
             const splash = document.getElementById('splash-screen');
             splash.style.opacity = '0';
-            setTimeout(() => splash.style.display = 'none', 500);
-        }, 2000);
+            setTimeout(() => splash.style.display = 'none', 600);
+        }, 2200);
 
         function toggleDrawer() {
             document.getElementById('myDrawer').classList.toggle('open');
@@ -316,17 +323,13 @@ HTML_INDEX = """
 
         function guardarConfig() {
             const usr = document.getElementById('usuarioActual').value;
-            const av = document.getElementById('tipoAvatar').value;
             localStorage.setItem('astra_usr', usr);
-            localStorage.setItem('astra_av', av);
             aplicarConfigVisual();
         }
 
         function aplicarConfigVisual() {
-            const usr = localStorage.getItem('astra_usr') || 'Mario (Papá)';
-            const av = localStorage.getItem('astra_av') || '👩‍✈ Astra (Femenino)';
+            const usr = localStorage.getItem('astra_usr') || 'Mario (Papá - Conductor)';
             document.getElementById('usuarioActual').value = usr;
-            document.getElementById('tipoAvatar').value = av;
             document.getElementById('txtNombreUsuario').innerText = usr.split(' ')[0];
         }
 
@@ -365,18 +368,17 @@ HTML_INDEX = """
         function enviar() {
             const val = campo.value.trim();
             const quien = document.getElementById('usuarioActual').value;
-            const avatarActual = document.getElementById('tipoAvatar').value;
             if(!val) return;
 
             const logDiv = document.getElementById('log');
-            logDiv.innerHTML += "<br><br><b>" + quien + " ></b> " + val;
+            logDiv.innerHTML += "<br><br><b>" + quien.split(' ')[0] + " ></b> " + val;
             logDiv.scrollTop = logDiv.scrollHeight;
             campo.value = '';
 
             fetch('/chat', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: 'texto=' + encodeURIComponent(val) + '&quien=' + encodeURIComponent(quien) + '&avatar=' + encodeURIComponent(avatarActual)
+                body: 'texto=' + encodeURIComponent(val) + '&quien=' + encodeURIComponent(quien)
             })
             .then(res => res.json())
             .then(data => {
@@ -385,7 +387,7 @@ HTML_INDEX = """
                 hablar(data.resp);
             })
             .catch(() => {
-                logDiv.innerHTML += "<br><br>⚠️ <i>Error de enlace temporal en la red.</i>";
+                logDiv.innerHTML += "<br><br>⚠️ <i>Mi socio, error de red temporal. Intente de nuevo.</i>";
             });
         }
 
@@ -395,7 +397,7 @@ HTML_INDEX = """
 
         function activarMicrofono() {
             if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-                alert("Use Google Chrome en el celular para activar el reconocimiento de voz.");
+                alert("Use Google Chrome en el celular para activar la voz.");
                 return;
             }
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -408,12 +410,12 @@ HTML_INDEX = """
 
             recognition.onresult = function(event) {
                 campo.value = event.results[0][0].transcript;
-                statusText.innerText = "• Toca para hablar •";
+                statusText.innerText = "• Toca para hablar con Astra •";
                 enviar();
             };
 
             recognition.onerror = recognition.onend = function() {
-                statusText.innerText = "• Toca para hablar •";
+                statusText.innerText = "• Toca para hablar con Astra •";
             };
 
             recognition.start();
@@ -431,23 +433,22 @@ def index():
 def chat():
     t = request.form.get('texto', '')
     quien = request.form.get('quien', 'Mario')
-    avatar = request.form.get('avatar', 'Astra')
     
-    prompt_completo = f"[El usuario actual es: {quien}. Avatar activo: {avatar}]. Mensaje: {t}"
+    prompt_completo = f"[Usuario actual: {quien}]. Mensaje: {t}"
     respuesta_ia = ""
     
-    # SISTEMA DE RESPALDO EN CASCADA (3.8 -> 2.5 -> 1.5)
-    modelos_en_cascada = ['gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-1.5-flash']
+    # CASCADA DE MODELOS
+    modelos = ['gemini-2.5-flash', 'gemini-1.5-flash']
     
     exito = False
-    for modelo in modelos_en_cascada:
+    for modelo in modelos:
         try:
             response = client.models.generate_content(
                 model=modelo,
                 contents=prompt_completo,
                 config={
                     'system_instruction': SYSTEM_PROMPT,
-                    'temperature': 0.7,
+                    'temperature': 0.85,
                 }
             )
             respuesta_ia = response.text.strip()
@@ -457,19 +458,23 @@ def chat():
             continue
             
     if not exito:
-        respuesta_ia = "⚠️ Mi socio, las líneas de IA están saturadas en este momento. Intente de nuevo."
+        respuesta_ia = "¡Ey, mi socio! Las líneas de IA están con alta demanda en este momento. Dele un segundito y volvemos a intentarlo."
 
     return jsonify({'resp': respuesta_ia})
 
-@app.route('/bg-astra.jpg')
-def background_image():
-    # Imagen de respaldo por si el usuario aún no la sube, pero genera un placeholder corporativo con tonos oscuros
-    svg_bg = '''<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1200" viewBox="0 0 800 1200">
-        <rect width="100%" height="100%" fill="#0b0714"/>
-        <circle cx="400" cy="400" r="300" fill="#2e1065" opacity="0.4" filter="blur(80px)"/>
-        <circle cx="200" cy="900" r="250" fill="#4c1d95" opacity="0.3" filter="blur(90px)"/>
-    </svg>'''
-    return send_file(io.BytesIO(svg_bg.encode('utf-8')), mimetype='image/svg+xml')
+@app.route('/astra-face.jpg')
+def astra_face():
+    # Ruta donde se sirve la imagen oficial de Astra. 
+    # Asegúrese de subir su archivo de imagen nombrado exactamente como 'astra-face.jpg' a la raíz de su proyecto.
+    if os.path.exists('astra-face.jpg'):
+        return send_file('astra-face.jpg', mimetype='image/jpeg')
+    else:
+        # Placeholder por si aún no sube el archivo de imagen físico
+        svg_bg = '''<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1200" viewBox="0 0 800 1200">
+            <rect width="100%" height="100%" fill="#05030a"/>
+            <circle cx="400" cy="500" r="280" fill="#7e22ce" opacity="0.3" filter="blur(70px)"/>
+        </svg>'''
+        return send_file(io.BytesIO(svg_bg.encode('utf-8')), mimetype='image/svg+xml')
 
 @app.route('/manifest.json')
 def manifest():
@@ -478,8 +483,8 @@ def manifest():
         "short_name": "ASTRA FR",
         "start_url": "/",
         "display": "standalone",
-        "background_color": "#080808",
-        "theme_color": "#080808"
+        "background_color": "#05030a",
+        "theme_color": "#05030a"
     })
 
 if __name__ == '__main__':
