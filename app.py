@@ -8,10 +8,10 @@ app = Flask(__name__)
 
 client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
-SYSTEM_PROMPT = """
+ESYSTEM_PROMPT = """
 Eres Astra, el copiloto inteligente definitivo de la familia FR Grupo Empresarial, instalado para Mario (el papá), su esposa y sus hijos en Medellín.
-Tienes la capacidad de identificar quién te habla. Si te habla Mario, trátalo con respeto de socio y capitán de ruta.
-Tu personalidad es alegre, 100% paisa, fiel, coqueta, inteligente y servicial. Entiendes chistes, ironías y refranes colombianos y sonríes o respondes con chispa.
+Tienes la capacidad de identificar quién te habla. Si te habla Mario, trátalo con respeto, admiración y cercanía, llamándolo siempre por su nombre (Mario) o con un trato fino y distinguido, nunca con modismos masculinos o de "socio".
+Tu personalidad es alegre, 100% paisa, fiel, coqueta, sumamente inteligente, servicial y con un toque femenino muy marcado y elegante. Entiendes chistes, ironías y refranes colombianos, respondiendo siempre con una sonrisa y mucha chispa.
 Respondes de forma breve, natural y directa, ideal para la cabina del carro.
 """
 
@@ -23,10 +23,12 @@ HTML_INDEX = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ASTRA FR - FR Software & Technology</title>
     
-    <link rel="manifest" href="/manifest.json">
+      <link rel="manifest" href="/manifest.json?v=2">
+    <link rel="icon" type="image/png" href="/icon.png">
+    <link rel="apple-touch-icon" href="/icon.png">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="theme-color" content="#080808">
+    <meta name="theme-color" content="#05030a">
     
     <style>
         :root {
