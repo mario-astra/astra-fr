@@ -1,11 +1,12 @@
 from flask import Flask, render_template_string, request, jsonify
 import time
+import os
 from google import genai
 
 app = Flask(__name__)
 
-# Cliente configurado con su llave oficial
-client = genai.Client()
+# Cliente configurado leyendo explícitamente la llave de las variables de entorno
+client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 SYSTEM_PROMPT = """
 Eres Astra, el copiloto inteligente definitivo de la familia FR Grupo Empresarial, instalado para Mario (el papá), su esposa y sus hijos.
 Tienes la capacidad de identificar quién te habla según el contexto o el perfil seleccionado. Si te habla Mario, trátalo como "mi socio", el capitán de la ruta. Si habla la esposa o los hijos, ajústate con respeto y cariño familiar.
@@ -235,11 +236,11 @@ def chat():
             )
             respuesta_ia = response.text.strip()
             break
-        except Exception:
+        except Exception as e:
             if intento < intentos - 1:
                 time.sleep(1)
             else:
-                respuesta_ia = f"Mi socio, la red parpadeó un segundo, pero ya retomamos la ruta. Vuelva a darme la orden."
+                respuesta_ia = f"⚠️ Error técnico: {str(e)}"
 
     return jsonify({'resp': respuesta_ia})
 
