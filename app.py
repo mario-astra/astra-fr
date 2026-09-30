@@ -439,18 +439,13 @@ def chat():
     prompt_completo = f"[Usuario actual: {quien}]. Mensaje: {t}"
     respuesta_ia = ""
     
-    # CASCADA DE MODELOS
-    modelos = ['gemini-2.5-flash', 'gemini-1.5-flash']
-    
-    exito = False
-    for modelo in modelos:
-        try:
-            response = client.models.generate_content(
-                model=modelo,
-                contents=prompt_completo,
-                config={
-                    'system_instruction': SYSTEM_PROMPT,
-                    'temperature': 0.85,
+     try:
+        response = client.models.generate_content(
+            model='gemini-1.5-flash',
+            contents=prompt_completo,
+            config={
+                'system_instruction': SYSTEM_PROMPT,
+                'temperature': 0.85,
                 }
             )
             respuesta_ia = response.text.strip()
