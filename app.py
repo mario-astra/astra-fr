@@ -1,12 +1,14 @@
-from flask import Flask, render_template_string, request, jsonify
+from flask import Flask, render_template_string, request, jsonify, send_file
 import time
 import os
+import io
 from google import genai
 
 app = Flask(__name__)
 
 # Cliente configurado leyendo explícitamente la llave de las variables de entorno
 client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+
 SYSTEM_PROMPT = """
 Eres Astra, el copiloto inteligente definitivo de la familia FR Grupo Empresarial, instalado para Mario (el papá), su esposa y sus hijos.
 Tienes la capacidad de identificar quién te habla según el contexto o el perfil seleccionado. Si te habla Mario, trátalo como "mi socio", el capitán de la ruta. Si habla la esposa o los hijos, ajústate con respeto y cariño familiar.
@@ -21,8 +23,7 @@ HTML_INDEX = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ASTRA FR - FR Software & Technology</title>
     
-        <link rel="manifest" href="/manifest.json">
-</head>
+    <link rel="manifest" href="/manifest.json">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#080808">
@@ -109,7 +110,6 @@ HTML_INDEX = """
     </div>
 
     <script>
-        // Menú lateral
         function toggleDrawer() {
             document.getElementById('myDrawer').classList.toggle('open');
         }
@@ -119,7 +119,6 @@ HTML_INDEX = """
             document.getElementById('lblUsuario').innerText = select.value.split(' ')[0];
         }
 
-        // PWA Install Banner
         let deferredPrompt;
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
@@ -229,7 +228,7 @@ def chat():
     for intento in range(intentos):
         try:
             response = client.models.generate_content(
-                model='gemini-3.8-flash',
+                model='gemini-2.5-flash',
                 contents=prompt_completo,
                 config={
                     'system_instruction': SYSTEM_PROMPT,
@@ -246,11 +245,7 @@ def chat():
 
     return jsonify({'resp': respuesta_ia})
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
-    import io
-from flask import send_file
-
+# --- RUTAS DE ICONOS NATIVOS Y MANIFIESTO PWA (FR SOFTWARE) ---
 @app.route('/icon-192.png')
 def icon_192():
     svg_data = '''<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
@@ -265,3 +260,32 @@ def icon_192():
 @app.route('/icon-512.png')
 def icon_512():
     return icon_192()
+
+@app.route('/manifest.json')
+def manifest():
+    return jsonify({
+        "name": "ASTRA FR - FR Software & Technology",
+        "short_name": "ASTRA FR",
+        "start_url": "/",
+        "display": "standalone",
+        "background_color": "#0a0a0c",
+        "theme_color": "#0a0a0c",
+        "icons": [
+            {
+                "src": "/icon-192.png",
+                "sizes": "192x192",
+                "type": "image/svg+xml",
+                "purpose": "any maskable"
+            },
+            {
+                "src": "/icon-512.png",
+                "sizes": "512x512",
+                "type": "image/svg+xml",
+                "purpose": "any maskable"
+            }
+        ]
+    })
+
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
