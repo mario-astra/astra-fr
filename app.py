@@ -29,18 +29,25 @@ HTML_INDEX = """
     <meta name="theme-color" content="#080808">
     
     <style>
-        body { background: #080808; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; }
+        :root {
+            --bg-color: #080808;
+            --panel-color: #121212;
+            --border-color: #333;
+            --accent-color: #d4af37;
+        }
+
+        body { background: var(--bg-color); color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; transition: background 0.3s ease; }
         
         /* Barra Superior Estilo App Profesional */
-        .top-bar { display: flex; justify-content: space-between; align-items: center; background: #121212; padding: 12px 15px; border-bottom: 1px solid #333; }
-        .menu-btn { background: none; border: none; color: #d4af37; font-size: 22px; cursor: pointer; }
-        .app-title { color: #d4af37; font-weight: bold; font-size: 16px; letter-spacing: 1px; }
-        .avatar-indicator { font-size: 14px; background: #222; padding: 4px 8px; border-radius: 6px; border: 1px solid #444; color: #aaa; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; background: var(--panel-color); padding: 12px 15px; border-bottom: 1px solid var(--border-color); }
+        .menu-btn { background: none; border: none; color: var(--accent-color); font-size: 22px; cursor: pointer; }
+        .app-title { color: var(--accent-color); font-weight: bold; font-size: 16px; letter-spacing: 1px; }
+        .avatar-indicator { font-size: 13px; background: #222; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border-color); color: #aaa; display: flex; align-items: center; gap: 5px; }
 
-        /* Menú Lateral Desplegable (Drawer) */
-        .drawer { position: fixed; top: 0; left: -260px; width: 260px; height: 100%; background: #111; border-right: 1px solid #333; transition: 0.3s; z-index: 1000; padding: 20px; box-sizing: border-box; }
+        /* Menú Lateral Desplegable (Drawer Personalizable) */
+        .drawer { position: fixed; top: 0; left: -280px; width: 280px; height: 100%; background: #111; border-right: 1px solid var(--border-color); transition: 0.3s; z-index: 1000; padding: 20px; box-sizing: border-box; overflow-y: auto; }
         .drawer.open { left: 0; }
-        .drawer h2 { color: #d4af37; font-size: 18px; margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .drawer h2 { color: var(--accent-color); font-size: 18px; margin-top: 0; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }
         .drawer label { display: block; font-size: 13px; color: #888; margin-top: 15px; margin-bottom: 5px; }
         .drawer select { width: 100%; padding: 8px; background: #222; color: #fff; border: 1px solid #444; border-radius: 5px; outline: none; }
         .close-drawer { background: none; border: none; color: #fff; font-size: 20px; float: right; cursor: pointer; }
@@ -48,16 +55,16 @@ HTML_INDEX = """
         /* Área de Chat y Pantalla */
         .main-content { display: flex; flex-direction: column; flex-grow: 1; padding: 15px; overflow: hidden; }
         
-        #log { font-size: 16px; color: #d4af37; background: #121212; padding: 15px; border-radius: 10px; border: 1px solid #333; width: 100%; max-width: 650px; margin: 0 auto; line-height: 1.4; text-align: left; flex-grow: 1; overflow-y: auto; box-sizing: border-box; }
+        #log { font-size: 16px; color: var(--accent-color); background: var(--panel-color); padding: 15px; border-radius: 10px; border: 1px solid var(--border-color); width: 100%; max-width: 650px; margin: 0 auto; line-height: 1.4; text-align: left; flex-grow: 1; overflow-y: auto; box-sizing: border-box; }
         
         .box { margin-top: 15px; display: flex; justify-content: center; gap: 8px; width: 100%; max-width: 650px; margin-left: auto; margin-right: auto; }
-        input { padding: 12px; flex-grow: 1; font-size: 16px; border-radius: 8px; border: 1px solid #444; background: #181818; color: #fff; outline: none; }
-        input:focus { border-color: #d4af37; }
-        button.send-btn { padding: 12px 18px; font-size: 15px; background: #d4af37; color: #000; border: none; font-weight: bold; cursor: pointer; border-radius: 8px; }
+        input { padding: 12px; flex-grow: 1; font-size: 16px; border-radius: 8px; border: 1px solid var(--border-color); background: #181818; color: #fff; outline: none; }
+        input:focus { border-color: var(--accent-color); }
+        button.send-btn { padding: 12px 18px; font-size: 15px; background: var(--accent-color); color: #000; border: none; font-weight: bold; cursor: pointer; border-radius: 8px; }
         button.mic-btn { padding: 12px 16px; font-size: 18px; background: #1a1a1a; border: 1px solid #60a5fa; color: #60a5fa; border-radius: 8px; cursor: pointer; }
         
-        .install-banner { background: #1e1e1e; border: 1px solid #d4af37; padding: 10px; text-align: center; font-size: 13px; display: none; }
-        .install-banner button { background: #d4af37; color: #000; border: none; padding: 4px 10px; font-weight: bold; border-radius: 4px; margin-left: 10px; cursor: pointer; }
+        .install-banner { background: #1e1e1e; border: 1px solid var(--accent-color); padding: 10px; text-align: center; font-size: 13px; display: none; }
+        .install-banner button { background: var(--accent-color); color: #000; border: none; padding: 4px 10px; font-weight: bold; border-radius: 4px; margin-left: 10px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -71,26 +78,41 @@ HTML_INDEX = """
     <div class="top-bar">
         <button class="menu-btn" onclick="toggleDrawer()">☰</button>
         <div class="app-title">ASTRA FR <span style="font-size:10px; color:#888;">(FR Software)</span></div>
-        <div class="avatar-indicator" id="lblUsuario">Mario</div>
+        <div class="avatar-indicator" id="lblUsuario">
+            <span id="iconAvatar">👩‍✈️</span> <span id="txtNombreUsuario">Mario</span>
+        </div>
     </div>
 
-    <!-- Menú Lateral (Configuración e Independencia) -->
+    <!-- Menú Lateral Avanzado (Configuración de Avatares, Voces y Colores) -->
     <div class="drawer" id="myDrawer">
         <button class="close-drawer" onclick="toggleDrawer()">✕</button>
         <h2>Configuración</h2>
         
         <label>¿Quién está usando la App?</label>
-        <select id="usuarioActual" onchange="actualizarPerfilText()">
+        <select id="usuarioActual" onchange="actualizarPerfil()">
             <option value="Mario (Papá)">Mario (Papá - Conductor)</option>
             <option value="Esposa">Esposa</option>
             <option value="Hijo">Hijo</option>
             <option value="Niña">Niña</option>
         </select>
 
-        <label>Voz / Avatar de Astra</label>
+        <label>Avatar de Astra</label>
+        <select id="tipoAvatar" onchange="actualizarPerfil()">
+            <option value="👩‍✈️ Astra (Femenino)">Astra (Operadora Femenina)</option>
+            <option value="👨‍✈️ Astro (Masculino)">Astro (Copiloto Masculino)</option>
+        </select>
+
+        <label>Voz de Asistencia</label>
         <select id="tipoVoz">
-            <option value="es-CO">Operadora Femenina (Latina)</option>
-            <option value="es-ES">Operadora Estándar</option>
+            <option value="es-CO">Latinoamericana Natural</option>
+            <option value="es-ES">Estándar Internacional</option>
+        </select>
+
+        <label>Tema de Colores (FR Style)</label>
+        <select id="temaColor" onchange="cambiarTema()">
+            <option value="dark">Negro Profundo & Dorado</option>
+            <option value="blue">Azul Nocturno Institucional</option>
+            <option value="metal">Gris Chasis & Plata</option>
         </select>
 
         <div style="margin-top: 30px; font-size: 11px; color: #666; text-align: center;">
@@ -100,7 +122,7 @@ HTML_INDEX = """
 
     <!-- Pantalla Principal -->
     <div class="main-content">
-        <div id="log"><b>Astra ></b> ¡Sistema en línea, mi socio! Despliegue el menú ☰ arriba para cambiar de perfil o toque el micrófono.</div>
+        <div id="log"><b>Astra ></b> ¡Sistema en línea, mi socio! Despliegue el menú ☰ arriba para personalizar su experiencia o toque el micrófono.</div>
 
         <div class="box">
             <button type="button" class="mic-btn" id="micBtn" onclick="activarMicrofono()" title="Hablar">🎙️</button>
@@ -114,9 +136,33 @@ HTML_INDEX = """
             document.getElementById('myDrawer').classList.toggle('open');
         }
 
-        function actualizarPerfilText() {
-            const select = document.getElementById('usuarioActual');
-            document.getElementById('lblUsuario').innerText = select.value.split(' ')[0];
+        function actualizarPerfil() {
+            const selectUsr = document.getElementById('usuarioActual');
+            const selectAv = document.getElementById('tipoAvatar');
+            
+            document.getElementById('txtNombreUsuario').innerText = selectUsr.value.split(' ')[0];
+            document.getElementById('iconAvatar').innerText = selectAv.value.includes('Femenino') ? '👩‍✈️' : '👨‍✈️';
+        }
+
+        function cambiarTema() {
+            const tema = document.getElementById('temaColor').value;
+            const root = document.documentElement;
+            if(tema === 'blue') {
+                root.style.setProperty('--bg-color', '#060c18');
+                root.style.setProperty('--panel-color', '#0f172a');
+                root.style.setProperty('--border-color', '#1e3a8a');
+                root.style.setProperty('--accent-color', '#60a5fa');
+            } else if(tema === 'metal') {
+                root.style.setProperty('--bg-color', '#111315');
+                root.style.setProperty('--panel-color', '#1c2024');
+                root.style.setProperty('--border-color', '#444c56');
+                root.style.setProperty('--accent-color', '#cbd5e1');
+            } else {
+                root.style.setProperty('--bg-color', '#080808');
+                root.style.setProperty('--panel-color', '#121212');
+                root.style.setProperty('--border-color', '#333');
+                root.style.setProperty('--accent-color', '#d4af37');
+            }
         }
 
         let deferredPrompt;
@@ -149,6 +195,7 @@ HTML_INDEX = """
         function enviar() {
             const val = campo.value.trim();
             const quien = document.getElementById('usuarioActual').value;
+            const avatarActual = document.getElementById('tipoAvatar').value;
             if(!val) return;
 
             const logDiv = document.getElementById('log');
@@ -160,7 +207,7 @@ HTML_INDEX = """
             fetch('/chat', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: 'texto=' + encodeURIComponent(val) + '&quien=' + encodeURIComponent(quien)
+                body: 'texto=' + encodeURIComponent(val) + '&quien=' + encodeURIComponent(quien) + '&avatar=' + encodeURIComponent(avatarActual)
             })
             .then(res => res.json())
             .then(data => {
@@ -219,8 +266,9 @@ def index():
 def chat():
     t = request.form.get('texto', '')
     quien = request.form.get('quien', 'Mario')
+    avatar = request.form.get('avatar', 'Astra')
     
-    prompt_completo = f"[El usuario actual que te está hablando es: {quien}]. Mensaje: {t}"
+    prompt_completo = f"[El usuario actual que te está hablando es: {quien}. Tu avatar configurado es: {avatar}]. Mensaje: {t}"
 
     respuesta_ia = ""
     intentos = 3
@@ -228,7 +276,7 @@ def chat():
     for intento in range(intentos):
         try:
             response = client.models.generate_content(
-                model='gemini-2.5-flash',
+                model='gemini-3.8-flash',
                 contents=prompt_completo,
                 config={
                     'system_instruction': SYSTEM_PROMPT,
@@ -245,15 +293,16 @@ def chat():
 
     return jsonify({'resp': respuesta_ia})
 
-# --- RUTAS DE ICONOS NATIVOS Y MANIFIESTO PWA (FR SOFTWARE) ---
+# --- RUTAS DE ICONOS Y MANIFIESTO PWA (FR SOFTWARE) ---
 @app.route('/icon-192.png')
 def icon_192():
     svg_data = '''<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
-        <rect width="100%" height="100%" fill="#0a0a0c"/>
-        <path d="M96 20 L150 40 L150 100 C150 135 125 165 96 175 C67 165 42 135 42 100 L42 40 Z" fill="#14171f" stroke="#d4af37" stroke-width="4"/>
-        <text x="96" y="75" font-family="Arial, sans-serif" font-weight="bold" font-size="36" fill="#d4af37" text-anchor="middle">FR</text>
-        <text x="96" y="135" font-family="Arial, sans-serif" font-weight="bold" font-size="11" fill="#e0e0e0" text-anchor="middle">FR SOFTWARE</text>
-        <text x="96" y="150" font-family="Arial, sans-serif" font-size="9" fill="#a0a0a0" text-anchor="middle">&amp; TECHNOLOGY</text>
+        <rect width="100%" height="100%" fill="#080808" rx="40"/>
+        <path d="M96 22 L154 44 L154 98 C154 136 128 166 96 176 C64 166 38 136 38 98 L38 44 Z" fill="#121216" stroke="#d4af37" stroke-width="5"/>
+        <circle cx="96" cy="80" r="24" fill="#0a0a0c" stroke="#d4af37" stroke-width="2"/>
+        <text x="96" y="87" font-family="Arial, sans-serif" font-weight="bold" font-size="20" fill="#d4af37" text-anchor="middle">FR</text>
+        <text x="96" y="132" font-family="Arial, sans-serif" font-weight="bold" font-size="10" fill="#ffffff" text-anchor="middle">FR SOFTWARE</text>
+        <text x="96" y="146" font-family="Arial, sans-serif" font-size="8" fill="#d4af37" text-anchor="middle">&amp; TECHNOLOGY</text>
     </svg>'''
     return send_file(io.BytesIO(svg_data.encode('utf-8')), mimetype='image/svg+xml')
 
@@ -268,8 +317,8 @@ def manifest():
         "short_name": "ASTRA FR",
         "start_url": "/",
         "display": "standalone",
-        "background_color": "#0a0a0c",
-        "theme_color": "#0a0a0c",
+        "background_color": "#080808",
+        "theme_color": "#080808",
         "icons": [
             {
                 "src": "/icon-192.png",
