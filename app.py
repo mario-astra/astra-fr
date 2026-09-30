@@ -227,7 +227,7 @@ def chat():
     for intento in range(intentos):
         try:
             response = client.models.generate_content(
-                model='gemini-2.0-flash',
+                model='gemini-3.8-flash',
                 contents=prompt_completo,
                 config={
                     'system_instruction': SYSTEM_PROMPT,
