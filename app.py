@@ -484,9 +484,20 @@ def manifest():
         "start_url": "/",
         "display": "standalone",
         "background_color": "#05030a",
-        "theme_color": "#05030a"
+        "theme_color": "#05030a",
+        "icons": [
+            {
+                "src": "/icon.png",
+                "sizes": "512x512",
+                "type": "image/png"
+            },
+            {
+                "src": "/logo.png",
+                "sizes": "512x512",
+                "type": "image/png"
+            }
+        ]
     })
-
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port, debug=True)
