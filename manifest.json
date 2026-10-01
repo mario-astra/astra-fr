@@ -1,20 +1,9 @@
 {
-  "name": "ASTRA FR - FR Software & Technology",
+  "name": "ASTRA FR",
   "short_name": "ASTRA FR",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#121212",
-  "theme_color": "#121212",
-  "icons": [
-    {
-      "src": "/icon.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    },
-    {
-      "src": "/logo.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    }
-  ]
+  "background_color": "#05030a",
+  "theme_color": "#05030a",
+  "icons": [{"src": "/icon.png","sizes": "512x512","type": "image/png","purpose": "any maskable"}]
 }
