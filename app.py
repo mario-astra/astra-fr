@@ -83,7 +83,7 @@ def chat():
 
     try:
         resp = client.models.generate_content(
-            model='gemini-2.0-flash',
+            model='gemini-2.5-flash',
             contents=prompt_final,
             config={'system_instruction': SYSTEM_PROMPT, 'temperature':0.85}
         )
