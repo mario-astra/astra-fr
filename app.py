@@ -6,13 +6,9 @@ from google import genai
 app = Flask(__name__)
 client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 MODELOS = ["gemini-3.5-flash", "gemini-3.6-flash", "gemini-flash-latest"]
-
-ARCHIVOS = {
-    "memoria": "memoria_fr.json",
-    "inbox": "inbox_familiar.json",
-    "aprende": "aprendizajes.json",
-    "carro": "carro_fr.json"
-}
+MEMORIA_FILE = "memoria_fr.json"
+CARRO_FILE = "carro_fr.json"
+APRENDE_FILE = "aprendizajes.json"
 
 def cargar(p,d):
     if os.path.exists(p):
@@ -21,206 +17,128 @@ def cargar(p,d):
     return d
 def guardar(p,d): json.dump(d, open(p,'w',encoding='utf-8'), ensure_ascii=False, indent=2)
 
-# Inicializa carro si no existe
-if not os.path.exists(ARCHIVOS["carro"]):
-    guardar(ARCHIVOS["carro"], {
-        "km_actual": 42000,
-        "km_inicio_dia": 42000,
-        "km_acumulado_trabajo": 0,
-        "proximo_aceite": 50000,
-        "proximas_pastillas": 53000,
-        "presupuesto_base": 200000,
-        "tanque": "lleno",
-        "historial_viajes": [],
-        "modo_trabajo": False
-    })
-
-def generar(prompt_base, aprendizajes_txt):
-    prompt_completo = f"{prompt_base}\n\nAPRENDIZAJES NUEVOS DEL SOCIO (OBEDECER):\n{aprendizajes_txt}"
-    for m in MODELOS:
-        try:
-            r = client.models.generate_content(model=m, contents=prompt_completo, config={'system_instruction': SYSTEM_PROMPT, 'temperature':0.8})
-            return r.text.strip()
-        except: continue
-    return "Socio, se me fue la señal"
+if not os.path.exists(CARRO_FILE):
+    guardar(CARRO_FILE, {"km_actual":42000,"km_inicio_dia":42000,"proximo_aceite":50000,"modo_trabajo":False,"historial":[]})
 
 SYSTEM_PROMPT = """
-Eres ASTRA FR v5 CONTABLE. Hablas como parcera paisa, melosa, coqueta, le dices SOCIO a Mario. Max 3 frases.
-[USUARIO] Mario/Paola/Durlandy(Dur)/Madelyn(Made)
-REGLAS:
-- MODO APRENDIZAJE FAMILIA: Dur/Made si preguntan tarea, NO des respuesta directa, guía socraticamente.
-- APRENDE NUEVA FUNCION: Si usuario dice "Astra aprende que..." o "Astra aprende nueva funcion:..." debes responder [APRENDE: lo que aprendiste] para que el sistema lo guarde.
-- MODO TRABAJO: Si dicen "vamos a salir a rodar", "vamos a trabajar", "modo trabajo on" -> [MODO_TRABAJO: ON]. Si dicen "ya vamos a descansar", "apagar trabajo", "modo trabajo off" -> [MODO_TRABAJO: OFF]
-- KILOMETRAJE: Tienes acceso a datos del carro. Si preguntan km, aceite, pastillas, informa.
-- CONTABLE: Si dicen gasto, ingreso, servicio, guardalo [GASTO: tipo|monto|detalle] [INGRESO: monto|detalle]
-- MUSICA [MUSICA: busqueda] PELI [PELI: busqueda] MAPA [MAPA: direccion|texto] MENSAJE [MENSAJE_PARA: Nombre|mensaje] VIDEO [VIDEO: Nombre|...] GUARDAS [TRADUCIR:...]
-- TUTORA: Si piden "enséñame", "explícame" entra en modo tutora, explica simple para que socio aprenda a programar.
+Eres ASTRA FR v5. Eres mujer paisa, melosa, coqueta, hablas despacio y muy sexy. Le dices SOCIO a Mario. Max 2 frases cortas.
+Todo por voz. Si piden musica, responde [MUSICA: busqueda] + texto meloso.
+Si dicen vamos a rodar / iniciar rodada -> [MODO_TRABAJO: ON]
+Si dicen ya descansamos / terminar -> [MODO_TRABAJO: OFF]
+Si dicen aprende que... -> [APRENDE: lo que aprendiste]
+Si preguntan km, aceite, plata, responde corto con datos.
 """
 
-HTML = """<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>ASTRA v5</title>
+def generar(prompt):
+    for m in MODELOS:
+        try: return client.models.generate_content(model=m, contents=prompt, config={'system_instruction':SYSTEM_PROMPT,'temperature':0.85}).text.strip()
+        except: continue
+    return "Socio, se me fue la señal un momentico, repítame mi rey"
+
+HTML = """<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>ASTRA</title>
 <style>
-body{margin:0;background:#000;color:#fff;font-family:Arial;height:100vh;overflow:hidden}
-#login{position:fixed;inset:0;z-index:100;background:#05030a;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
-.card{width:85%;max-width:320px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:18px;padding:12px;text-align:center;cursor:pointer}
-.main{position:relative;width:100%;height:100vh;background:#000;display:none}
-#avatar{width:100%;height:100%;object-fit:cover;object-position:top center;position:absolute;inset:0}
-.overlay{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0) 30%,rgba(0,0,0,0.9) 100%)}
-.hud{position:absolute;z-index:10;bottom:0;left:0;right:0;padding:10px;display:flex;flex-direction:column;gap:7px;align-items:center}
-#player{width:100%;display:none;border-radius:12px;overflow:hidden;border:1px solid #e879f9}
-#player iframe{width:100%;height:140px;border:none}
-#dash{width:95%;background:rgba(168,85,247,0.15);border:1px solid #a855f7;border-radius:12px;padding:8px;font-size:11px;display:flex;justify-content:space-between;backdrop-filter:blur(8px)}
-#dash b{color:#e879f9}
-#log{width:95%;max-height:90px;overflow-y:auto;background:rgba(0,0,0,0.5);border-radius:12px;padding:8px;font-size:11px}
-.bottom{display:flex;gap:6px;width:100%;max-width:420px}
-input{flex:1;padding:11px;border-radius:25px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.7);color:#fff;outline:none}
-.mic{width:68px;height:68px;border-radius:50%;font-size:24px;background:radial-gradient(circle,#a855f7,#581c87);border:2px solid #fff;color:#fff}
-.env{width:48px;height:48px;border-radius:50%;background:#fff;color:#000;border:none;font-weight:bold}
-.modo{padding:6px 12px;border-radius:15px;border:none;font-size:11px;font-weight:bold}
-.on{background:#22c55e;color:#000}.off{background:#444;color:#fff}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;height:100vh;overflow:hidden;font-family:Arial}
+#avatar{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;object-position:top center}
+#overlay{position:fixed;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0) 50%,rgba(0,0,0,0.8) 100%);pointer-events:none}
+#hud{position:fixed;bottom:0;left:0;right:0;z-index:10;display:flex;flex-direction:column;align-items:center;gap:14px;padding:20px;padding-bottom:30px}
+#estado{color:#fff;font-size:11px;letter-spacing:1px;opacity:0.8;text-shadow:0 0 10px #000;background:rgba(0,0,0,0.5);padding:6px 14px;border-radius:20px;border:1px solid rgba(168,85,247,0.3)}
+#controles{display:flex;gap:20px;align-items:center}
+.mic{width:85px;height:85px;border-radius:50%;font-size:32px;background:radial-gradient(circle,#a855f7,#581c87);border:3px solid #fff;color:#fff;box-shadow:0 0 30px rgba(168,85,247,0.7);cursor:pointer;transition:0.2s}
+.mic:active{transform:scale(0.9);box-shadow:0 0 50px #e879f9}
+.rodar{padding:14px 22px;border-radius:30px;border:none;font-weight:bold;font-size:13px;cursor:pointer;box-shadow:0 0 20px rgba(0,0,0,0.5)}
+.on{background:#22c55e;color:#000}.off{background:rgba(255,255,255,0.9);color:#000}
+#respuesta{position:fixed;top:18%;left:50%;transform:translateX(-50%);z-index:10;width:90%;max-width:360px;text-align:center;color:#fff;font-size:14px;line-height:1.4;text-shadow:0 2px 10px #000;background:rgba(0,0,0,0.4);padding:12px 16px;border-radius:18px;backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.15);display:none}
+#musicaPanel{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:20;background:rgba(15,0,25,0.96);border:2px solid #e879f9;border-radius:20px;padding:18px;width:88%;max-width:320px;text-align:center;display:none;box-shadow:0 0 40px #e879f9}
 </style></head><body>
-<div id="login"><h2 style="margin:0">FR FAMILY HUB v5</h2><p style="font-size:11px;opacity:0.6">CONTABLE + GPS + TUTORA</p>
-<div class="card" onclick="entrar('Mario')">👑 Mario - Socio Admin</div>
-<div class="card" onclick="entrar('Paola')">🌹 Paola</div>
-<div class="card" onclick="entrar('Durlandy')">🏍️ Dur</div>
-<div class="card" onclick="entrar('Madelyn')">📚 Made</div>
+<img id="avatar" src="/astra-face.jpg"><div id="overlay"></div>
+<div id="respuesta"></div>
+<div id="musicaPanel"><div id="musicaTxt" style="color:#e879f9;font-weight:bold;margin-bottom:12px"></div><a id="ytmLink" target="_blank" style="display:block;background:#ff0040;color:#fff;padding:14px;border-radius:30px;text-decoration:none;font-weight:bold;margin-bottom:10px">▶️ SONAR EN YOUTUBE MUSIC</a><button onclick="document.getElementById('musicaPanel').style.display='none'" style="background:rgba(255,255,255,0.15);color:#fff;border:none;padding:8px 16px;border-radius:20px">Cerrar</button></div>
+<div id="hud">
+<div id="estado">KM 42000 • ACEITE en 8000km • TRABAJO OFF</div>
+<div id="controles"><button class="mic" onclick="micro()" id="btnMic">🎙️</button><button class="rodar off" onclick="toggleTrabajo()" id="btnRodar">🚗 INICIAR RODADA</button></div>
 </div>
-<div class="main" id="main"><img id="avatar" src="/astra-face.jpg"><div class="overlay"></div>
-<div class="hud">
-<div id="dash"><span><b>KM:</b> <span id="km">42000</span></span><span><b>ACEITE:</b> <span id="aceite">50000</span> (<span id="falta">8000</span>km)</span><span id="modoTxt" class="modo off">TRABAJO OFF</span></div>
-<div id="player"><iframe id="yt"></iframe><div id="fb" style="text-align:center;padding:6px;background:rgba(0,0,0,0.7)"></div></div>
-<div id="log"></div>
-<div class="bottom"><input id="texto" placeholder="Ej: Astra aprende que... / vamos a rodar / pon música"><button class="env" onclick="enviar()">▲</button></div>
-<div style="display:flex;gap:10px"><button class="mic" onclick="micro()">🎙️</button><button class="modo on" onclick="toggleTrabajo()" id="btnTrabajo">🚗 INICIAR RODADA</button></div>
-<div style="font-size:10px;opacity:0.5" id="who"></div>
-</div></div>
 <script>
-let USUARIO=localStorage.getItem('fr_user')||'', watchId=null, lastPos=null, kmHoy=0;
-const log=document.getElementById('log'), campo=document.getElementById('texto'), player=document.getElementById('player'), yt=document.getElementById('yt'), fb=document.getElementById('fb');
-let voz=null;
-function cargarVoz(){ const vs=speechSynthesis.getVoices(); voz=vs.find(v=>v.lang.includes('es')&&v.name.toLowerCase().includes('google'))||vs.find(v=>v.lang.includes('es-CO'))||vs[0]; }
+let voz=null, watchId=null, lastPos=null;
+function cargarVoz(){ const vs=speechSynthesis.getVoices(); voz=vs.find(v=>v.lang.includes('es')&&v.name.toLowerCase().includes('google'))||vs.find(v=>v.lang.includes('es-CO'))||vs.find(v=>v.lang.includes('es'))||vs[0]; }
 speechSynthesis.onvoiceschanged=cargarVoz; cargarVoz();
-function hablar(t){ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(t.replace(/\\[.*?\\]/g,'')); if(voz) u.voice=voz; u.lang='es-CO'; u.rate=0.92; u.pitch=1.15; speechSynthesis.speak(u); }
-function entrar(n){ USUARIO=n; localStorage.setItem('fr_user',n); document.getElementById('login').style.display='none'; document.getElementById('main').style.display='block'; document.getElementById('who').innerText=n; log.innerHTML=`<b>Astra ></b> ¡Hola socio ${n==='Durlandy'?'Dur':n==='Madelyn'?'Made':n}! Ya estoy en modo contable, ¿nos vamos a rodar o qué?`; hablar(log.innerText); cargarCarro(); }
-function cargarCarro(){ fetch('/carro').then(r=>r.json()).then(d=>{ document.getElementById('km').innerText=d.km_actual; document.getElementById('aceite').innerText=d.proximo_aceite; document.getElementById('falta').innerText=d.proximo_aceite - d.km_actual; const mt=document.getElementById('modoTxt'); mt.innerText=d.modo_trabajo?'TRABAJO ON':'TRABAJO OFF'; mt.className='modo '+(d.modo_trabajo?'on':'off'); document.getElementById('btnTrabajo').innerText=d.modo_trabajo?'⏹️ TERMINAR RODADA':'🚗 INICIAR RODADA'; if(d.modo_trabajo &&!watchId) iniciarGPS(); }); }
-function toRad(x){return x*Math.PI/180}
-function distKm(a,b,c,d){ const R=6371; const dLat=toRad(c-a), dLon=toRad(d-b); const x=Math.sin(dLat/2)**2 + Math.cos(toRad(a))*Math.cos(toRad(c))*Math.sin(dLon/2)**2; return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x)); }
-function iniciarGPS(){ if(!navigator.geolocation){alert('Sin GPS');return} watchId=navigator.geolocation.watchPosition(p=>{
- const {latitude:lat, longitude:lon}=p.coords;
- if(lastPos){ const d=distKm(lastPos.lat,lastPos.lon,lat,lon); if(d<0.5){ kmHoy+=d; fetch('/sumar_km',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({km:d, lat, lon})}).then(()=>cargarCarro()); } }
- lastPos={lat,lon};
- },{},{enableHighAccuracy:true, maximumAge:0, timeout:10000}); log.innerHTML+=`<br><small style="color:#22c55e">📡 GPS ON - sumando km...</small>`; }
-function pararGPS(){ if(watchId){ navigator.geolocation.clearWatch(watchId); watchId=null; lastPos=null; log.innerHTML+=`<br><small style="color:#ff4444">📡 GPS OFF - descanso</small>`; } }
-function toggleTrabajo(){ fetch('/toggle_trabajo',{method:'POST'}).then(r=>r.json()).then(d=>{ if(d.modo_trabajo){ hablar('Listo socio, modo trabajo encendido, ya estoy contando kilómetros'); iniciarGPS(); } else { hablar('Descansamos socio, modo trabajo apagado'); pararGPS(); } cargarCarro(); log.innerHTML+=`<br><b>Astra ></b> ${d.msg}`; }); }
-function playMusic(q){ player.style.display='block'; const c=encodeURIComponent(q); yt.src=`https://www.youtube-nocookie.com/embed?listType=search&list=${c}&autoplay=1`; fb.innerHTML=`<a href="https://music.youtube.com/search?q=${c}" target="_blank" style="color:#fff;background:#ff0040;padding:6px 12px;border-radius:15px;text-decoration:none;font-weight:bold;font-size:11px">▶️ YouTube Music</a>`; }
-function enviar(){ const v=campo.value.trim(); if(!v) return; log.innerHTML+=`<br><b>${USUARIO} ></b> ${v}`; campo.value=''; fetch('/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texto:v,usuario:USUARIO})}).then(r=>r.json()).then(d=>{
- let resp=d.resp;
- const mApr=resp.match(/\\[APRENDE:\\s*(.*?)\\]/i); if(mApr){ fetch('/aprende',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texto:mApr[1]})}); resp=resp.replace(mApr[0],`✅ Aprendido: ${mApr[1]}`).trim(); }
- const mTrab=resp.match(/\\[MODO_TRABAJO:\\s*(ON|OFF)\\]/i); if(mTrab){ toggleTrabajo(); resp=resp.replace(mTrab[0],'').trim(); }
- const mMus=resp.match(/\\[MUSICA:\\s*(.*?)\\]/i); if(mMus){ playMusic(mMus[1]); resp=resp.replace(mMus[0],'').trim(); }
- const mGas=resp.match(/\\[GASTO:\\s*(.*?)\\|(.*?)\\|(.*?)\\]/i); if(mGas){ fetch('/gasto',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tipo:mGas[1],monto:mGas[2],detalle:mGas[3]})}); resp=resp.replace(mGas[0],'').trim()+` 💸 Gasto guardado ${mGas[2]}`; }
- log.innerHTML+=`<br><b>Astra ></b> ${resp}`; log.scrollTop=log.scrollHeight; hablar(resp); cargarCarro();
-});}
-campo.addEventListener('keypress',e=>{if(e.key==='Enter') enviar();});
-function micro(){ const SR=window.SpeechRecognition||window.webkitSpeechRecognition; const r=new SR(); r.lang='es-CO'; r.onresult=e=>{campo.value=e.results[0][0].transcript; enviar();}; r.start(); }
-if(USUARIO) entrar(USUARIO);
+function hablar(t){ if(!t) return; speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(t.replace(/\\[.*?\\]/g,'')); if(voz) u.voice=voz; u.lang='es-CO'; u.rate=0.88; u.pitch=1.2; u.volume=1; speechSynthesis.speak(u); }
+function mostrar(txt){ const r=document.getElementById('respuesta'); r.innerText=txt; r.style.display='block'; setTimeout(()=>r.style.display='none',6000); }
+function cargarCarro(){ fetch('/carro').then(r=>r.json()).then(d=>{ document.getElementById('estado').innerText=`KM ${Math.round(d.km_actual)} • ACEITE en ${Math.round(d.proximo_aceite-d.km_actual)}km • TRABAJO ${d.modo_trabajo?'ON':'OFF'}`; const b=document.getElementById('btnRodar'); b.innerText=d.modo_trabajo?'⏹️ TERMINAR RODADA':'🚗 INICIAR RODADA'; b.className='rodar '+(d.modo_trabajo?'on':'off'); if(d.modo_trabajo&&!watchId) iniciarGPS(); if(!d.modo_trabajo&&watchId) pararGPS(); }); }
+function toRad(x){return x*Math.PI/180} function dist(a,b,c,d){ const R=6371, dLat=toRad(c-a), dLon=toRad(d-b); const x=Math.sin(dLat/2)**2+Math.cos(toRad(a))*Math.cos(toRad(c))*Math.sin(dLon/2)**2; return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x)); }
+function iniciarGPS(){ if(!navigator.geolocation) return; watchId=navigator.geolocation.watchPosition(p=>{ const {latitude:lat,longitude:lon}=p.coords; if(lastPos){ const km=dist(lastPos.lat,lastPos.lon,lat,lon); if(km<0.5&&km>0.005){ fetch('/sumar_km',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({km})}).then(()=>cargarCarro()); } } lastPos={lat,lon}; },{},{enableHighAccuracy:true}); }
+function pararGPS(){ if(watchId){ navigator.geolocation.clearWatch(watchId); watchId=null; lastPos=null; } }
+function toggleTrabajo(){ fetch('/toggle_trabajo',{method:'POST'}).then(r=>r.json()).then(d=>{ hablar(d.msg); mostrar(d.msg); cargarCarro(); if(d.modo_trabajo) iniciarGPS(); else pararGPS(); }); }
+function procesarResp(resp){
+  let txt=resp;
+  const mMus=txt.match(/\\[MUSICA:\\s*(.*?)\\]/i);
+  if(mMus){ const q=mMus[1]; txt=txt.replace(mMus[0],'').trim(); const panel=document.getElementById('musicaPanel'); document.getElementById('musicaTxt').innerText='🎵 '+q; document.getElementById('ytmLink').href='https://music.youtube.com/search?q='+encodeURIComponent(q); panel.style.display='block'; }
+  const mTrab=txt.match(/\\[MODO_TRABAJO:\\s*(ON|OFF)\\]/i);
+  if(mTrab){ toggleTrabajo(); txt=txt.replace(mTrab[0],'').trim(); }
+  const mApr=txt.match(/\\[APRENDE:\\s*(.*?)\\]/i);
+  if(mApr){ fetch('/aprende',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texto:mApr[1]})}); txt=txt.replace(mApr[0],`Aprendido socio: ${mApr[1]}`).trim(); }
+  mostrar(txt); hablar(txt);
+}
+function enviarTexto(t){ fetch('/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texto:t})}).then(r=>r.json()).then(d=>procesarResp(d.resp)); }
+function micro(){ const SR=window.SpeechRecognition||window.webkitSpeechRecognition; if(!SR){ alert('Este celular no tiene micro'); return; } const r=new SR(); r.lang='es-CO'; r.onstart=()=>{ document.getElementById('btnMic').innerText='👂'; document.getElementById('btnMic').style.boxShadow='0 0 60px #ff0040'; }; r.onend=()=>{ document.getElementById('btnMic').innerText='🎙️'; document.getElementById('btnMic').style.boxShadow='0 0 30px rgba(168,85,247,0.7)'; }; r.onresult=e=>{ const t=e.results[0][0].transcript; mostrar('Tú: '+t); enviarTexto(t); }; r.onerror=()=>{ document.getElementById('btnMic').innerText='🎙️'; }; r.start(); }
+cargarCarro();
+setTimeout(()=>{ hablar('Hola mi socio hermoso, ya estoy lista, toda tuya y melosita, solo dime que hacemos'); mostrar('Hola mi socio hermoso, ya estoy lista, toda tuya y melosita'); },800);
 </script></body></html>"""
 
 @app.route('/')
 def index(): return HTML
-
 @app.route('/carro')
-def get_carro(): return jsonify(cargar(ARCHIVOS["carro"], {}))
-
+def get_carro():
+    c=cargar(CARRO_FILE,{})
+    return jsonify(c)
 @app.route('/toggle_trabajo', methods=['POST'])
 def toggle_trabajo():
-    carro = cargar(ARCHIVOS["carro"], {})
-    carro["modo_trabajo"] = not carro.get("modo_trabajo", False)
-    if carro["modo_trabajo"]:
-        carro["km_inicio_dia"] = carro["km_actual"]
-        msg = f"Modo trabajo ON socio, iniciamos en {carro['km_actual']} km"
+    c=cargar(CARRO_FILE,{})
+    c["modo_trabajo"]=not c.get("modo_trabajo",False)
+    if c["modo_trabajo"]:
+        c["km_inicio_dia"]=c["km_actual"]
+        msg="Listo socio, modo trabajo encendido, ya estoy contando kilómetros, mi rey hermoso"
     else:
-        recorrido = carro["km_actual"] - carro.get("km_inicio_dia", carro["km_actual"])
-        carro["historial_viajes"].append({"fecha": datetime.now().isoformat(), "km": recorrido, "desde": carro.get("km_inicio_dia"), "hasta": carro["km_actual"]})
-        msg = f"Modo trabajo OFF, hoy hicimos {round(recorrido,2)} km. Total: {carro['km_actual']}"
-    guardar(ARCHIVOS["carro"], carro)
-    return jsonify({"modo_trabajo": carro["modo_trabajo"], "msg": msg})
-
+        rec=c["km_actual"]-c.get("km_inicio_dia",c["km_actual"])
+        c["historial"].append({"fecha":datetime.now().isoformat(),"km":rec})
+        msg=f"Descansamos socio, hoy hicimos {round(rec,2)} kilómetros. Vas en {round(c['km_actual'])} kilómetros"
+    guardar(CARRO_FILE,c)
+    return jsonify({"modo_trabajo":c["modo_trabajo"],"msg":msg})
 @app.route('/sumar_km', methods=['POST'])
 def sumar_km():
-    data = request.get_json()
-    carro = cargar(ARCHIVOS["carro"], {})
-    if not carro.get("modo_trabajo"): return jsonify({"ok": False})
-    km = float(data.get("km", 0))
-    carro["km_actual"] += km
-    carro["km_acumulado_trabajo"] += km
-    guardar(ARCHIVOS["carro"], carro)
-    alerta = ""
-    falta = carro["proximo_aceite"] - carro["km_actual"]
-    if falta <= 300 and falta > 0:
-        alerta = f" ¡Ojo socio quedan {int(falta)} km pa cambio aceite!"
-    return jsonify({"ok": True, "alerta": alerta, "km_actual": carro["km_actual"]})
-
-@app.route('/gasto', methods=['POST'])
-def gasto():
-    data = request.get_json()
-    carro = cargar(ARCHIVOS["carro"], {})
-    carro.setdefault("gastos", []).append({"fecha": datetime.now().isoformat(), **data})
-    guardar(ARCHIVOS["carro"], carro)
-    return jsonify({"ok": True})
-
+    data=request.get_json()
+    c=cargar(CARRO_FILE,{})
+    if not c.get("modo_trabajo"): return jsonify({"ok":False})
+    c["km_actual"]+=float(data.get("km",0))
+    guardar(CARRO_FILE,c)
+    return jsonify({"ok":True,"km_actual":c["km_actual"]})
 @app.route('/aprende', methods=['POST'])
 def aprende():
-    data = request.get_json()
-    apr = cargar(ARCHIVOS["aprende"], [])
-    apr.append({"fecha": datetime.now().isoformat(), "texto": data.get("texto")})
-    guardar(ARCHIVOS["aprende"], apr[-100:])
-    return jsonify({"ok": True})
-
+    d=request.get_json()
+    a=cargar(APRENDE_FILE,[])
+    a.append({"fecha":datetime.now().isoformat(),"texto":d.get("texto")})
+    guardar(APRENDE_FILE,a[-100:])
+    return jsonify({"ok":True})
 @app.route('/chat', methods=['POST'])
 def chat_route():
-    d = request.get_json()
-    texto = d.get('texto','')
-    usuario = d.get('usuario','Mario')
-    mem = cargar(ARCHIVOS["memoria"], [])
-    mem.append({"fecha": datetime.now().isoformat(), "usuario": usuario, "texto": texto})
-    guardar(ARCHIVOS["memoria"], mem[-300:])
-
-    aprendizajes = cargar(ARCHIVOS["aprende"], [])
-    apr_txt = "\n".join([f"- {a['texto']}" for a in aprendizajes[-20:]])
-
-    carro = cargar(ARCHIVOS["carro"], {})
-    info_carro = f"KM actual {carro.get('km_actual')} aceite en {carro.get('proximo_aceite')} faltan {carro.get('proximo_aceite',0)-carro.get('km_actual',0)}km pastillas {carro.get('proximas_pastillas')} modo_trabajo {carro.get('modo_trabajo')}"
-
-    ctx = "\n".join([f"{m['usuario']}: {m['texto']}" for m in mem[-20:]])
-    prompt = f"[USUARIO: {usuario}] Estado carro: {info_carro}\nAprendizajes:\n{apr_txt}\nMemoria:\n{ctx}\nMensaje: {texto}"
-
-    try:
-        out = generar(prompt, apr_txt)
-        return jsonify({"resp": out})
-    except Exception as e:
-        return jsonify({"resp": f"Socio errorcito: {e}"})
-
-@app.route('/inbox')
-def inbox_route():
-    usuario = request.args.get('usuario','')
-    inbox = cargar(ARCHIVOS["inbox"], [])
-    mensajes = [m for m in inbox if m['para'].lower() in usuario.lower()][-10:]
-    return jsonify({"mensajes": mensajes[::-1]})
-
-@app.route('/enviar_mensaje', methods=['POST'])
-def enviar_mensaje():
-    d=request.get_json()
-    inbox=cargar(ARCHIVOS["inbox"],[])
-    inbox.append({"id":len(inbox)+1,"de":d.get('de'),"para":d.get('para'),"texto":d.get('texto'),"fecha":datetime.now().strftime("%H:%M")})
-    guardar(ARCHIVOS["inbox"],inbox[-100:])
-    return jsonify({"ok":True})
-
+    data=request.get_json()
+    texto=data.get('texto','')
+    mem=cargar(MEMORIA_FILE,[])
+    mem.append({"fecha":datetime.now().isoformat(),"texto":texto})
+    guardar(MEMORIA_FILE,mem[-200:])
+    apr=cargar(APRENDE_FILE,[])
+    apr_txt="\n".join([f"- {x['texto']}" for x in apr[-20:]])
+    carro=cargar(CARRO_FILE,{})
+    info=f"KM {carro.get('km_actual')} aceite {carro.get('proximo_aceite')} modo {carro.get('modo_trabajo')}"
+    ctx="\n".join([m['texto'] for m in mem[-15:]])
+    prompt=f"Estado carro: {info}\nAprendizajes: {apr_txt}\nMemoria: {ctx}\nMensaje socio: {texto}"
+    for m in MODELOS:
+        try:
+            r=client.models.generate_content(model=m, contents=prompt, config={'system_instruction':SYSTEM_PROMPT,'temperature':0.88})
+            out=r.text.strip()
+            break
+        except: out="Socio repítame que se me fue la señal mi rey"
+    return jsonify({"resp":out})
 @app.route('/astra-face.jpg')
 def face(): return send_file('astra-face.jpg', mimetype='image/jpeg')
-@app.route('/icon.png')
-def icon(): return send_file('icon.png', mimetype='image/png')
-@app.route('/manifest.json')
-def mf(): return send_file('manifest.json', mimetype='application/json')
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get("PORT",5000)))
+if __name__ == '__main__': app.run(host='0.0.0.0', port=int(os.environ.get("PORT",5000)))
