@@ -82,18 +82,19 @@ def generar_respuesta_gemini(usuario, mensaje):
 
     prompt_final = f"{system_prompt}\n\nMensaje de {usuario.get('nombre', 'Usuario')}: {mensaje}"
 
-    try:
-        # Intentamos consultar el modelo
-        response = model.generate_content(prompt_final)
-        return response.text.strip()
-    except Exception as e:
-        # Si falla gemini-1.5-flash, probamos con gemini-pro como respaldo automático
+    # Probar nombres de modelos compatibles para eliminar el 404
+    modelos_a_probar = ['gemini-1.5-flash-001', 'gemini-1.5-pro', 'gemini-pro']
+    
+    for m in modelos_a_probar:
         try:
-            m_alt = genai.GenerativeModel('gemini-pro')
-            res_alt = m_alt.generate_content(prompt_final)
-            return res_alt.text.strip()
-        except Exception as ex:
-            return f"Lo siento {usuario.get('corto', 'Mario')}, tuve un problema de conexión con la API: {str(e)}"
+            mod = genai.GenerativeModel(m)
+            response = mod.generate_content(prompt_final)
+            if response and response.text:
+                return response.text.strip()
+        except Exception as e:
+            continue
+
+    return f"Lo siento {usuario.get('corto', 'Mario')}, no pude conectar con los modelos de Gemini. Verifica tu GEMINI_API_KEY en Render."
 
 # ==========================================
 # RUTAS DE FLASK Y FRONTEND
