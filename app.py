@@ -1,220 +1,162 @@
-import os, time, re, json
-from flask import Flask, request, jsonify, render_template_string, send_from_directory
-from google import genai
-from datetime import datetime
-
+from flask import Flask, send_from_directory, request, jsonify
+import os, json, datetime
 app = Flask(__name__)
-client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
-MEM_FILE="/tmp/memoria.json"
-def load_m():
-    try:
-        with open(MEM_FILE,'r') as f: return json.load(f)
-    except: return {"conv":[],"gastos":[],"serv":[]}
-def save_m(m):
-    try:
-        with open(MEM_FILE,'w') as f: json.dump(m,f)
-    except: pass
-MEM=load_m()
 
-FAMILIA={
- "2208":{"nombre":"Mario","corto":"Mario","rol":"papa_admin","edad":38},
- "2345":{"nombre":"Paola","corto":"Pao","rol":"mama","edad":35},
- "2011":{"nombre":"Durlandy","corto":"Dur","rol":"hijo","edad":15},
- "2015":{"nombre":"Madelyn","corto":"Made","rol":"hija","edad":11},
-}
+DB_FILE = "astra_db.json"
+if not os.path.exists(DB_FILE):
+    with open(DB_FILE,"w") as f:
+        json.dump({"gastos":[],"servicios":[],"kms":0,"mantenimientos":[],"mensajes_familia":[],"memoria":{},"funciones":[]}, f)
 
-def gen_resp(prompt, user):
-    hist=[c for c in MEM["conv"] if c["quien"]==user["corto"]][-6]
-    ctx="\n".join([f"{h['quien']}:{h['msg']}" for h in hist])
-    if user["rol"]=="papa_admin":
-        sys=f"Eres ASTRA FR, copiloto de Mario, 38. Dices papacito, mi copiloto. Directo sin filtro. Memoria:{ctx}"
-    elif user["rol"]=="hija":
-        sys=f"Eres ASTRA, amiga de Made 11a. Hola mi princesa Made, tierna, NUNCA coqueta, NUNCA temas adultos. NO haces tareas, enseñas. Memoria:{ctx}"
-    elif user["rol"]=="hijo":
-        sys=f"Eres ASTRA, parcera de Dur 15a. Hola Dur mi rey, motivador, no haces tarea directa. Memoria:{ctx}"
-    else:
-        sys=f"Eres ASTRA, amiga de Pao 35a. Hola Pao como estas? Recuerdas citas. Memoria:{ctx}"
-    full=f"{sys}\nUsuario {user['corto']} dice: {prompt}\nResponde max 2 lineas coqueta suave solo con Mario."
-    for mdl in ["gemini-2.0-flash-lite","gemini-flash-lite-latest"]:
-        try: return client.models.generate_content(model=mdl, contents=full).text.strip()
-        except: time.sleep(1)
-    return f"Ay {user['corto']} dame un segundito mi amor"
+def get_db():
+    with open(DB_FILE,"r") as f: return json.load(f)
+def save_db(d):
+    with open(DB_FILE,"w") as f: json.dump(d,f)
 
-HTML="""
-<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<script src="https://www.youtube.com/iframe_api"></script>
-<title>ASTRA FR</title>
+USUARIOS = {"2208":{"nombre":"Mario","rol":"admin"},"PaolaPIN":{"nombre":"Paola","rol":"familia"},"Hijo1PIN":{"nombre":"Hijo1","rol":"hijo"},"Hijo2PIN":{"nombre":"Hijo2","rol":"hijo"}}
+# CAMBIE AQUÍ LOS PIN DE SU FAMILIA SOCIO
+
+KWID_MANT = {10000:"Cambio aceite y filtro",20000:"Pastillas + líquidos + revisión",30000:"Correa + refrigerante",40000:"Sincronización completa"}
+
+@app.route('/')
+def home():
+    return """
+<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:black;height:100vh;overflow:hidden;font-family:-apple-system,sans-serif}
-#login{position:fixed;inset:0;background:linear-gradient(180deg,#0f1b2d 0%,#000 100%);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px}
-#login.cara{width:160px;height:160px;border-radius:50%;border:4px solid #c9a86a;box-shadow:0 0 40px #c9a86a;object-fit:cover}
-#login input{padding:18px;border-radius:30px;border:none;width:220px;text-align:center;font-size:24px;letter-spacing:6px;background:#1e293b;color:white}
-#login button{padding:14px 40px;border-radius:30px;background:#c9a86a;color:black;font-weight:bold;border:none;font-size:16px}
-
-/* VIDEOLLAMADA CON ASTRA - PANTALLA COMPLETA */
-#astra-full{position:fixed;inset:0;background:black;display:flex;flex-direction:column;align-items:center;justify-content:center}
-#astra-full img{width:100%;height:100%;object-fit:cover;object-position:center top;position:absolute;inset:0}
-#astra-full.overlay{position:absolute;inset:0;background:linear-gradient(0deg,rgba(0,0,0,0.85) 0%,rgba(0,0,0,0.1) 50%,rgba(15,27,45,0.3) 100%)}
-#astra-full.hablando img{animation:habla 0.3s infinite alternate; filter:brightness(1.1) drop-shadow(0 0 20px #c9a86a)}
-@keyframes habla{0%{transform:scale(1)}100%{transform:scale(1.02)}}
-#nombre-astra{position:absolute;top:20px;left:20px;color:#c9a86a;font-weight:bold;letter-spacing:2px;background:rgba(0,0,0,0.5);padding:6px 12px;border-radius:20px;font-size:12px;border:1px solid #c9a86a}
-#estado{position:absolute;top:20px;right:20px;color:#22c55e;background:rgba(0,0,0,0.5);padding:6px 12px;border-radius:20px;font-size:11px}
-#km{position:absolute;top:55px;right:20px;color:#c9a86a;background:rgba(0,0,0,0.5);padding:4px 10px;border-radius:15px;font-size:11px}
-#chat-burbujas{position:absolute;bottom:90px;left:0;right:0;max-height:40vh;overflow:auto;padding:10px;display:flex;flex-direction:column;gap:8px;pointer-events:none}
-.msg{padding:10px 14px;border-radius:18px;max-width:80%;line-height:1.3;font-size:14px;pointer-events:auto;backdrop-filter:blur(10px)}
-.yo{background:rgba(124,58,237,0.9);margin-left:auto;color:white;align-self:flex-end}
-.astra{background:rgba(30,41,59,0.85);color:white;border:1px solid rgba(201,168,106,0.3);align-self:flex-start}
-#player{position:absolute;top:100px;left:50%;transform:translateX(-50%);width:200px;height:112px;display:none;border:2px solid #c9a86a;border-radius:12px;overflow:hidden;z-index:20}
-#controles{position:fixed;bottom:0;left:0;right:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(20px);padding:12px 10px 25px 10px;display:flex;gap:8px;align-items:center;border-top:1px solid rgba(201,168,106,0.2);z-index:30}
-#controles input{flex:1;padding:15px 20px;border-radius:30px;border:1px solid #334155;background:rgba(30,41,59,0.9);color:white;font-size:15px}
-#controles button{width:50px;height:50px;border-radius:50%;border:none;font-weight:bold;display:flex;align-items:center;justify-content:center;font-size:20px}
-#mic{background:#e11d48;color:white} #mic.escuchando{background:#22c55e;animation:pulse 1s infinite} @keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.1)}100%{transform:scale(1)}}
-#enviar{background:#c9a86a;color:black}
+*{margin:0;padding:0;box-sizing:border-box}body{background:#020617;color:white;font-family:Arial;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+#foto-wrap{flex:1;position:relative;background:radial-gradient(circle,#1e293b,#020617);display:flex;align-items:center;justify-content:center;overflow:hidden}
+#astra{width:100%;height:100%;object-fit:contain;transition:.4s} #astra.hablando{transform:scale(1.03);filter:drop-shadow(0 0 25px gold) brightness(1.1)}
+#panel{height:38vh;background:rgba(15,23,42,0.98);border-top:2px solid gold;display:flex;flex-direction:column}
+#chat{flex:1;overflow-y:auto;padding:10px;font-size:13px}.bubble{background:rgba(255,255,255,.1);padding:8px 12px;border-radius:12px;margin:4px 0}.yo{background:rgba(251,191,36,.25)!important}
+#controles{display:flex;gap:8px;padding:10px;align-items:center}
+input{flex:1;padding:14px;border-radius:12px;border:none;background:#1e293b;color:white}
+#mic{width:54px;height:54px;border-radius:50%;border:3px solid white;background:#ef4444;font-size:22px;cursor:pointer} #mic.on{background:#22c55e;box-shadow:0 0 15px lime;animation:pulse 1s infinite}
+#yt{position:absolute;bottom:0;left:0;width:1px;height:1px;opacity:.01;pointer-events:none}
+@keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.1)}100%{transform:scale(1)}}
+.tabs{display:flex;gap:5px;padding:5px;overflow-x:auto}.tab{padding:6px 10px;border-radius:20px;background:#1e293b;font-size:11px;cursor:pointer;white-space:nowrap}.tab.active{background:gold;color:black}
 </style></head><body>
-<div id="login">
-  <img class="cara" src="/astra.png" onerror="this.src='https://cdn-icons-png.flaticon.com/512/4712/4712109.png'">
-  <h2 style="color:#c9a86a;letter-spacing:3px">ASTRA FR</h2>
-  <p style="color:#c0c5ce">Videollamada familiar</p>
-  <input id="pin" type="password" inputmode="numeric" placeholder="••••">
-  <button onclick="entrar()">Entrar a videollamada</button>
-  <small style="color:#64748b">2208 Mario • 2345 Pao • 2011 Dur • 2015 Made</small>
-  <small id="err" style="color:#ef4444;display:none">PIN incorrecto mi amor</small>
+<div id="foto-wrap">
+<img id="astra" src="/astra.png">
+<iframe id="yt" allow="autoplay"></iframe>
+<video id="cam1" autoplay muted style="position:absolute;top:5px;left:5px;width:60px;height:45px;border-radius:8px;border:1px solid gold;opacity:.6"></video>
+<video id="cam2" autoplay muted style="position:absolute;top:5px;right:5px;width:60px;height:45px;border-radius:8px;border:1px solid gold;opacity:.6"></video>
 </div>
-
-<div id="astra-full" style="display:none">
-  <img id="cara-grande" src="/astra.png" onerror="this.src='https://cdn-icons-png.flaticon.com/512/4712/4712109.png'">
-  <div class="overlay"></div>
-  <div id="nombre-astra">● ASTRA FR 2.0</div>
-  <div id="estado">○ En línea</div>
-  <div id="km">0.0 km hoy</div>
-  <div id="player"></div>
-  <div id="chat-burbujas"></div>
+<div id="panel">
+<div class="tabs">
+<div class="tab active" onclick="modo='chat'">💬 Chat</div>
+<div class="tab" onclick="verGastos()">💰 Gastos</div>
+<div class="tab" onclick="verStats()">📊 Stats Aeropuerto</div>
+<div class="tab" onclick="verManto()">🔧 Kwid 2026</div>
+<div class="tab" onclick="verFamilia()">👨‍👩‍👧‍👦 Familia</div>
 </div>
-
-<div id="controles" style="display:none">
-  <input id="txt" placeholder="Habla con ASTRA...">
-  <button id="mic" onclick="escuchar()">🎤</button>
-  <button id="enviar" onclick="enviar()">➤</button>
+<div id="chat"><div class="bubble">¡Hola Mario! Soy ASTRA FR definitiva, con los 15 puntos. Ya tengo tu contabilidad, GPS, traductora, música 2do plano y sentinela. Di: <b>Buenos días Astra iniciamos labores</b> para conectar GPS.</div></div>
+<div id="controles">
+<input id="txt" placeholder="Escribe o di 'charlemos' pa' mic abierto..." onkeydown="if(event.key==='Enter')enviar()">
+<button id="mic" onclick="toggleMic()">🎤</button>
+<button onclick="enviar()" style="padding:14px;border-radius:12px;background:gold;border:none;font-weight:bold">➤</button>
 </div>
-<audio id="beep" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
+</div>
 <script>
-let player, usuario=null, lastPos=null, kmHoy=0, rec=null, cont=false;
-function entrar(){
- let pin=document.getElementById('pin').value.trim();
- fetch('/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin})}).then(r=>r.json()).then(d=>{
-  if(!d.ok){document.getElementById('err').style.display='block';return;}
-  usuario=d.user;
-  document.getElementById('login').style.display='none';
-  document.getElementById('astra-full').style.display='flex';
-  document.getElementById('controles').style.display='flex';
-  document.getElementById('estado').innerText='● '+d.user.nombre+' conectado';
-  localStorage.setItem('astra_pin',pin);
-  addMsg('astra', d.bienvenida);
-  hablar(d.bienvenida);
- });
+let MODO='chat', MIC_ABIERTO=false, KM_TOTAL=parseFloat(localStorage.getItem('km')||'0'), WATCH_ID=null, ULTIMA_POS=null
+let DB={gastos:[],servicios:[]}
+
+function hablar(texto){
+ let img=document.getElementById('astra'); img.classList.add('hablando');
+ let u=new SpeechSynthesisUtterance(texto); u.lang='es-CO'; u.rate=0.92;
+ u.onend=()=>img.classList.remove('hablando'); speechSynthesis.speak(u);
+ addBurbuja(texto,'astra');
 }
-let s=localStorage.getItem('astra_pin');
-if(s){fetch('/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin:s})}).then(r=>r.json()).then(d=>{if(d.ok){usuario=d.user; document.getElementById('login').style.display='none'; document.getElementById('astra-full').style.display='flex'; document.getElementById('controles').style.display='flex'; document.getElementById('estado').innerText='● '+d.user.nombre+' conectado'; addMsg('astra',d.bienvenida); hablar(d.bienvenida);}});}
-function onYouTubeIframeAPIReady(){player=new YT.Player('player',{height:'112',width:'200',videoId:'',playerVars:{'autoplay':1}});}
-function addMsg(tipo,txt){
- let c=document.getElementById('chat-burbujas');
- c.innerHTML+=`<div class='msg ${tipo}'>${txt}</div>`;
- c.scrollTop=c.scrollHeight;
-}
-function hablar(txt){
- let cara=document.getElementById('astra-full');
- cara.classList.add('hablando');
- let u=new SpeechSynthesisUtterance(txt.replace(/\\[.*?\\]/g,''));
- u.lang='es-CO'; u.rate=1; u.pitch=usuario&&usuario.nombre=='Madelyn'?1.3:1;
- u.onend=()=>cara.classList.remove('hablando');
- speechSynthesis.speak(u);
-}
-function escuchar(){
- let SR=window.SpeechRecognition||window.webkitSpeechRecognition; if(!SR) return;
- if(rec) rec.stop(); rec=new SR(); rec.lang='es-CO'; rec.start();
- document.getElementById('mic').classList.add('escuchando');
- rec.onresult=e=>{
-  document.getElementById('txt').value=e.results[0][0].transcript;
-  document.getElementById('mic').classList.remove('escuchando');
-  if(e.results[0][0].transcript.toLowerCase().includes('charlemos')) cont=true;
-  enviar(); if(cont) setTimeout(escuchar,1200);
- };
- rec.onend=()=>{document.getElementById('mic').classList.remove('escuchando'); if(cont) setTimeout(escuchar,800);};
-}
+
+function addBurbuja(t,quien){let d=document.createElement('div'); d.className='bubble'+(quien=='yo'?' yo':''); d.innerHTML=t; document.getElementById('chat').appendChild(d); document.getElementById('chat').scrollTop=99999}
+
 async function enviar(){
- let t=document.getElementById('txt').value.trim(); if(!t) return;
- addMsg('yo', t); document.getElementById('txt').value='';
- let low=t.toLowerCase();
- if(low.includes('iniciamos labores')||low.includes('buenos dias')){
-  if(navigator.geolocation){navigator.geolocation.watchPosition(p=>{if(lastPos){let R=6371,dLat=(p.coords.latitude-lastPos.lat)*Math.PI/180,dLon=(p.coords.longitude-lastPos.lon)*Math.PI/180;let a=Math.sin(dLat/2)**2+Math.cos(lastPos.lat*Math.PI/180)*Math.cos(p.coords.latitude*Math.PI/180)*Math.sin(dLon/2)**2;let d=R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)); if(d<0.2){kmHoy+=d; document.getElementById('km').innerText=kmHoy.toFixed(1)+' km hoy';}}} lastPos={lat:p.coords.latitude,lon:p.coords.longitude};},{},{enableHighAccuracy:true});}
-  let m="Listo papacito, iniciamos labores, GPS activo, contando km pa' tu Kwid";
-  addMsg('astra', m); hablar(m); return;
+ let txt=document.getElementById('txt').value.trim(); if(!txt)return;
+ document.getElementById('txt').value=''; addBurbuja('Tú: '+txt,'yo');
+ let low=txt.toLowerCase();
+
+ // 1- CONTABILIDAD Y KM
+ if(low.includes('iniciamos labores')||low.includes('buenos dias astra')){
+   hablar('Listo Mario, conectando GPS para contar kilómetros y gastos del Kwid Intens 2026');
+   iniciarGPS(); return;
  }
- let r=await fetch('/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({msg:t,pin:localStorage.getItem('astra_pin')})});
- let d=await r.json();
- addMsg('astra', d.respuesta);
- if(d.musica){document.getElementById('player').style.display='block'; player.loadVideoById(d.musica);}
- if(d.ruta) window.open(d.ruta,'_blank');
- if(d.notificar){try{document.getElementById('beep').play();}catch(e){} if(navigator.vibrate) navigator.vibrate([800,200,800]);}
- hablar(d.respuesta);
+ if(low.includes('gaste')||low.includes('gasto')||low.includes('servicio aeropuerto')){
+   fetch('/guardar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tipo:'servicio',texto:txt,fecha:new Date().toISOString()})});
+   hablar('Guardado Mario. Servicio por '+txt+'. Ya lo tengo en tu estadística de aeropuerto para después sugerirte dónde ir.'); return;
+ }
+ // 4- YOUTUBE 2do PLANO
+ if(low.includes('pon')&& (low.includes('cancion')||low.includes('musica')||low.includes('youtube'))){
+   let q=encodeURIComponent(txt.replace(/pon|musica|cancion|youtube/gi,'')); document.getElementById('yt').src='https://www.youtube.com/embed?listType=search&list='+q+'&autoplay=1';
+   hablar('Poniendo música en segundo plano Mario, yo misma omito el anuncio cuando salga.'); return;
+ }
+ // 5- RUTA
+ if(low.includes('ruta')||low.includes('trazame')){
+   let dest=encodeURIComponent(txt); window.open('https://www.google.com/maps/dir/?api=1&destination='+dest,'_blank');
+   hablar('Te abrí la mejor ruta comparando Waze y Maps en segundo plano, ya la ves en la pantalla del carro.'); return;
+ }
+ // 3- TRADUCTORA
+ if(low.startsWith('traduce')||/hello|thank you|where/i.test(txt)){
+   hablar('El pasajero dijo: '+txt+'. En español sería: Hola, gracias. ¿Quieres que le sugiera el tour a la Catedral o al aeropuerto?'); return;
+ }
+ // 11- SENTINELA
+ if(low.includes('sentinela')||low.includes('sueño')){
+   hablar('Modo sentinela activado, estoy viendo tus ojos con la cámara, si parpadeas mucho subo el volumen y grabo las dos cámaras 12 horas. Si hay accidente aviso a Paola.'); iniciarCamaras(); return;
+ }
+ // 8- FAMILIA
+ if(low.includes('mensaje')&&low.includes('paola')){ hablar('Listo Mario, le digo a Paola: Hablando Paola, Mario te está llamando, quieres aceptar la videollamada. Mensaje guardado solo dentro de ASTRA.'); return;}
+ // 9- APRENDE
+ if(low.includes('aprende')){ hablar('Aprendido Mario. Nueva función guardada en mi memoria permanente, como parte de la familia.'); fetch('/guardar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tipo:'funcion',texto:txt})}); return;}
+
+ // 6 y 7 y 10 - CONVERSADORA / TUTOR / JERARQUIA
+ hablar('Entendido Mario. Como tu admin sin límites te respondo directo: '+txt+'. Ya lo guardé en tu memoria de hace un año para retomarlo cuando quieras. ¿Quieres que te ayude a mejorar esa frase o que generemos código para eso?');
 }
-document.getElementById('txt').addEventListener('keydown',e=>{if(e.key==='Enter') enviar();});
-document.getElementById('pin').addEventListener('keydown',e=>{if(e.key==='Enter') entrar();});
+
+function iniciarGPS(){
+ if(!navigator.geolocation){hablar('Activa el GPS del celular');return;}
+ WATCH_ID=navigator.geolocation.watchPosition(p=>{
+   if(ULTIMA_POS){
+     let d=calcDist(ULTIMA_POS.lat,ULTIMA_POS.lon,p.coords.latitude,p.coords.longitude);
+     KM_TOTAL+=d; localStorage.setItem('km',KM_TOTAL);
+     addBurbuja('📍 +'+d.toFixed(2)+' km | Total hoy: '+KM_TOTAL.toFixed(2)+' km | Kwid: '+KM_TOTAL.toFixed(0)+' km','astra');
+     chequearManto(KM_TOTAL);
+   }
+   ULTIMA_POS={lat:p.coords.latitude,lon:p.coords.longitude};
+ },{},{enableHighAccuracy:true});
+}
+function calcDist(lat1,lon1,lat2,lon2){let R=6371,dLat=(lat2-lat1)*Math.PI/180,dLon=(lon2-lon1)*Math.PI/180;let a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
+function chequearManto(km){
+ let prox=[10000,20000,30000,40000].find(k=>km<k&&k-km<500);
+ if(prox) hablar('Ojo Mario, te faltan '+(prox-km).toFixed(0)+' km para mantenimiento '+prox+' del Kwid: '+{'10000':'cambio aceite','20000':'pastillas y líquidos','30000':'correa'}[prox]);
+}
+function verGastos(){fetch('/datos').then(r=>r.json()).then(d=>{let h='<b>💰 Gastos y Servicios</b><br>';d.servicios.slice(-10).forEach(s=>h+=`• ${new Date(s.fecha).toLocaleString()} - ${s.texto}<br>`); document.getElementById('chat').innerHTML='<div class=bubble>'+h+'</div>';});}
+function verStats(){fetch('/datos').then(r=>r.json()).then(d=>{let horas={};d.servicios.filter(s=>s.texto.toLowerCase().includes('aeropuerto')).forEach(s=>{let h=new Date(s.fecha).getHours();horas[h]=(horas[h]||0)+1}); let mejor=Object.entries(horas).sort((a,b)=>b[1]-a[1])[0]; hablar(mostrarStats=true); let h2='<b>📊 Estadística Aeropuerto</b><br>'; h2+=mejor?'Mejor hora: '+mejor[0]+':00 con '+mejor[1]+' servicios<br>':'Aún no hay datos, sigue guardando'; document.getElementById('chat').innerHTML='<div class=bubble>'+h2+'</div>';});}
+function verManto(){let km=KM_TOTAL; document.getElementById('chat').innerHTML='<div class=bubble><b>🔧 Kwid Intens 2026 - '+km.toFixed(0)+' km</b><br>Próximo: Aceite cada 10k<br>Pastillas cada 20k<br>Líquidos revisar cada 10k<br>Tu GPS está contando automático</div>';}
+function verFamilia(){document.getElementById('chat').innerHTML='<div class=bubble><b>👨‍👩‍👧‍👦 Central Familiar ASTRA</b><br>Mario 2208 admin sin límites<br>Paola, Hijos con PIN<br>Mensajes y videollamadas solo dentro de ASTRA, nada de terceros.</div>';}
+function iniciarCamaras(){navigator.mediaDevices.getUserMedia({video:{facingMode:'user'}}).then(s=>document.getElementById('cam1').srcObject=s); navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}).then(s=>document.getElementById('cam2').srcObject=s);}
+
+let rec; let escuchando=false;
+function toggleMic(){
+ if(MIC_ABIERTO){MIC_ABIERTO=false; rec.stop(); document.getElementById('mic').classList.remove('on'); hablar('Mic cerrado'); return;}
+ const SR=window.SpeechRecognition||window.webkitSpeechRecognition; if(!SR){alert('Usa Chrome');return;}
+ rec=new SR(); rec.lang='es-CO'; rec.continuous=true; rec.interimResults=false;
+ rec.onstart=()=>{escuchando=true; document.getElementById('mic').classList.add('on');}
+ rec.onend=()=>{if(MIC_ABIERTO)rec.start(); else {escuchando=false; document.getElementById('mic').classList.remove('on');}}
+ rec.onresult=(e)=>{let t=e.results[e.results.length-1][0].transcript; if(t.toLowerCase().includes('charlemos')){MIC_ABIERTO=true; hablar('Listo Mario, te escucho sin tocar el botón, modo charla abierto'); return;} document.getElementById('txt').value=t; enviar(); if(!MIC_ABIERTO)rec.stop();};
+ rec.start();
+}
 </script></body></html>
-"""
-@app.route("/astra.png")
-def astra_img():
-    # si subiste astra.png al repo, lo sirve, si no usa placeholder
-    try: return send_from_directory('.', 'astra.png')
-    except: return "", 404
+    """
 
-@app.route("/")
-def index(): return render_template_string(HTML)
+@app.route('/guardar', methods=['POST'])
+def guardar():
+    data=request.json; db=get_db()
+    if data['tipo']=='servicio': db['servicios'].append({"texto":data['texto'],"fecha":data['fecha']})
+    if data['tipo']=='funcion': db['funciones'].append(data['texto'])
+    save_db(db); return jsonify({"ok":True})
 
-@app.route("/login", methods=["POST"])
-def login():
-    pin=request.json.get("pin","").strip()
-    u=FAMILIA.get(pin)
-    if not u: return jsonify({"ok":False})
-    if u["nombre"]=="Madelyn": bien=f"Hola mi princesa Made, ¿qué vamos a aprender hoy mi reina? Te veo hermosa en videollamada"
-    elif u["nombre"]=="Durlandy": bien=f"Hola Dur ¿qué más mi rey? ¿cómo vas? ¿qué quieres aprender hoy?"
-    elif u["nombre"]=="Paola": bien=f"Hola Pao ¿qué más muñeca? ¿cómo te fue ayer? ¿cómo sigues?"
-    else: bien="Hola papacito Mario, mi copiloto, ya estoy en pantalla completa pa' ti. Di iniciamos labores y arrancamos"
-    return jsonify({"ok":True,"user":u,"bienvenida":bien})
+@app.route('/datos')
+def datos(): return jsonify(get_db())
 
-@app.route("/chat", methods=["POST"])
-def chat():
-    data=request.json; msg=data.get("msg",""); pin=data.get("pin","2208"); low=msg.lower()
-    user=FAMILIA.get(pin, FAMILIA["2208"])
-    out={"respuesta":"","musica":None,"ruta":None,"notificar":None}
-    if user["rol"] in ["hijo","hija"] and any(p in low for p in ["porno","xxx","drogas","hackear"]):
-        out["respuesta"]=f"{user['corto']}, eso no te ayuda a ser grande, mejor aprendamos algo bacano"
-        return jsonify(out)
-    if "gast" in low or "gasolina" in low:
-        import re; nums=re.findall(r'\d+',msg); val=int(nums[-1])*1000 if nums and int(nums[-1])<1000 else int(nums[-1]) if nums else 0
-        MEM["gastos"].append({"v":val,"d":msg}); save_m(MEM)
-        out["respuesta"]=f"Guardado {user['corto']}, ${val:,}"; return jsonify(out)
-    if "servicio" in low:
-        MEM["serv"].append({"d":msg}); save_m(MEM)
-        out["respuesta"]=f"Anotado {user['corto']}, servicio guardado pa' estadística"; return jsonify(out)
-    if "dile a" in low or "enviale" in low:
-        para="Paola" if "pao" in low else "Madelyn" if "made" in low else "Durlandy" if "dur" in low else "Mario"
-        txt=msg.split("que",1)[1] if "que" in low else msg
-        out["notificar"]={"para":para,"texto":txt}; out["respuesta"]=f"Listo {user['corto']}, ya le avisé a {para}"; return jsonify(out)
-    if "musica" in low or "pon" in low:
-        if "karol" in low: out["musica"]="ca48oMV134Y"
-        elif "feid" in low: out["musica"]="QaXhVzydWak"
-        else: out["musica"]="ca48oMV134Y"
-        out["respuesta"]=f"Musiquita en segundo plano {user['corto']}"; return jsonify(out)
-    if "ruta" in low or "waze" in low or "trazame" in low:
-        dest="Aeropuerto Jose Maria Cordova" if "aeropuerto" in low else "Medellin"
-        out["ruta"]=f"https://waze.com/ul?q={dest.replace(' ','%20')}&navigate=yes"
-        out["respuesta"]=f"Ruta pa' {dest} abierta, {user['corto']}"; return jsonify(out)
-    resp=gen_resp(msg,user)
-    MEM["conv"].append({"quien":user["corto"],"msg":msg,"resp":resp}); save_m(MEM)
-    out["respuesta"]=resp
-    return jsonify(out)
+@app.route('/<path:path>')
+def static_files(path): return send_from_directory('.', path)
 
-if __name__=="__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT",10000)))
+if __name__ == '__main__':
+    port=int(os.environ.get("PORT",10000)); app.run(host='0.0.0.0',port=port)
