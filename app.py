@@ -92,6 +92,7 @@ def generar_respuesta_gemini(usuario, mensaje):
             if response and response.text:
                 return response.text.strip()
         except Exception as e:
+            print(f"Error con modelo {m}: {e}")
             continue
 
     return f"Lo siento {usuario.get('corto', 'Mario')}, no pude conectar con los modelos de Gemini. Verifica tu GEMINI_API_KEY en Render."
@@ -279,7 +280,7 @@ function cargar(tab) {
         } else if (tab === 'kwid') {
             html = `<b>🔧 Mantenimiento Kwid Intens 2026</b><br>Km actual: ${KM_TOTAL.toFixed(1)} km`;
         } else if (tab === 'familia') {
-            html = '<b>👨‍👩‍👧‍👦 Mensajes Centrales</b><br>';
+            html = '<b>👨‍‍👩‍👧‍👦 Mensajes Centrales</b><br>';
             (d.mensajes || []).slice(-6).reverse().forEach(m => html += `• <b>${m.de}:</b> ${m.texto}<br>`);
         }
         document.getElementById('chat').innerHTML = '<div class="bubble astra">' + html + '</div>';
