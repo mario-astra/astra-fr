@@ -83,7 +83,7 @@ def generar_respuesta_gemini(usuario, mensaje):
     prompt_final = f"{system_prompt}\n\nMensaje de {usuario.get('nombre', 'Usuario')}: {mensaje}"
 
     # Probar nombres de modelos compatibles para eliminar el 404
-    modelos_a_probar = ['gemini-1.5-flash-001', 'gemini-1.5-pro', 'gemini-pro']
+    modelos_a_probar = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-exp']
     
     for m in modelos_a_probar:
         try:
