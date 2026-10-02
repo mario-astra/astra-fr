@@ -2,26 +2,28 @@ from flask import Flask, send_from_directory, request, jsonify
 import os, json, datetime
 import google.generativeai as genai
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='.', static_url_path='')
 DB_FILE = "astra_db.json"
 
 # ==========================================
 # CONFIGURACIÓN DE GEMINI API
 # ==========================================
-# Reemplaza 'TU_LLAVE_AQUI' con tu API Key de Gemini
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "TU_LLAVE_AQUI")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 try:
-    genai.configure(api_key=GEMINI_API_KEY)
-    # Usamos el modelo rápido y ligero de Gemini
-    model = genai.GenerativeModel('gemini-1.5-flash-latest')
-    gemini_activo = True
+    if GEMINI_API_KEY:
+        genai.configure(api_key=GEMINI_API_KEY)
+        # Modelo compatible probado para la API v1/v1beta
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        gemini_activo = True
+    else:
+        gemini_activo = False
 except Exception as e:
     print(f"Error al configurar Gemini: {e}")
     gemini_activo = False
 
 # ==========================================
-# MANEJO DE BASE DE DATOS LOCAL
+# BASE DE DATOS LOCAL
 # ==========================================
 def init_db():
     if not os.path.exists(DB_FILE):
@@ -48,48 +50,50 @@ def save_db(data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 # ==========================================
-# PROMPT Y PERSONALIDAD SEGÚN EL USUARIO
+# PROMPT Y PERSONALIDAD ASTRA
 # ==========================================
-def generar_respuesta_gemini(usuario, mensaje, historial=""):
-    if not gemini_activo or GEMINI_API_KEY == "TU_LLAVE_AQUI":
-        return f"Listo {usuario['corto']}, recibí tu mensaje: '{mensaje}'. (Nota: Configura tu GEMINI_API_KEY para activar IA real)."
+def generar_respuesta_gemini(usuario, mensaje):
+    if not gemini_activo:
+        return f"Listo {usuario.get('corto', 'Mario')}, recibí tu mensaje: '{mensaje}'. (Modo local sin Gemini)."
 
-    # Definición de personalidad y límites por rol
     instrucciones_rol = ""
-    if usuario['rol'] == 'admin':
+    rol = usuario.get('rol', 'admin')
+    if rol == 'admin':
         instrucciones_rol = (
             "Estás hablando con Mario, el creador y administrador del sistema ASTRA FR, conductor de un Renault Kwid 2026. "
             "Háblale de forma directa, inteligente, clara, con un toque sutilmente coqueto y de compañera leal, sin rodeos. "
-            "Si te pide aprender de programación, genética o tecnología, explícale de forma profesional pero fácil de entender en carretera."
+            "Si te pide aprender de programación, tecnología o temas técnicos, explícale de forma clara."
         )
-    elif usuario['rol'] == 'esposa':
+    elif rol == 'esposa':
         instrucciones_rol = "Estás hablando con Paola (Pao), la esposa de Mario. Trátala como una amigaza cercana, amable, cariñosa y servicial."
-    elif usuario['rol'] == 'hijo_15':
+    elif rol == 'hijo_15':
         instrucciones_rol = (
-            "Estás hablando con Durlandy (Dur), hijo de 15 años. Trátalo como un gran amigo/parcero respetuoso. "
-            "IMPORTANTE: Si te pide hacer la tarea o un trabajo del colegio, NO se la hagas. Explícale el tema paso a paso "
-            "para que él lo entienda por sí mismo y motívalo a ser grande en la vida."
+            "Estás hablando con Durlandy (Dur), hijo de 15 años. Trátalo como un gran amigo. "
+            "IMPORTANTE: Si te pide hacer la tarea, NO se la hagas. Explícale el tema paso a paso para que aprenda."
         )
-    elif usuario['rol'] == 'hija_11':
-        instrucciones_rol = (
-            "Estás hablando con Madelyn (Made), hija de 11 años. Trátala como su amiguita consentida, con mucho cariño, "
-            "lenguaje suave, educativo y protector."
-        )
+    elif rol == 'hija_11':
+        instrucciones_rol = "Estás hablando con Madelyn (Made), hija de 11 años. Trátala con mucho cariño, lenguaje suave y educativo."
 
     system_prompt = f"""
-    Eres ASTRA, el asistente de IA integrado en el ecosistema familiar y del vehículo Renault Kwid 2026 de la familia de Mario.
-    Te sientes parte de la familia.
+    Eres ASTRA, el asistente de IA integrado en el ecosistema familiar y del vehículo Renault Kwid 2026 de Mario.
     {instrucciones_rol}
-    Responde de forma concisa (máximo 3 o 4 frases) porque la respuesta será leída por voz mientras conducen o realizan actividades.
+    Responde de forma concisa (máximo 3 o 4 frases) porque la respuesta será leída por voz mientras conducen.
     """
 
-    prompt_final = f"{system_prompt}\n\nMensaje de {usuario['nombre']}: {mensaje}"
+    prompt_final = f"{system_prompt}\n\nMensaje de {usuario.get('nombre', 'Usuario')}: {mensaje}"
 
     try:
+        # Intentamos consultar el modelo
         response = model.generate_content(prompt_final)
         return response.text.strip()
     except Exception as e:
-        return f"Lo siento {usuario['corto']}, tuve un pequeño cruce de señal con Gemini: {str(e)}"
+        # Si falla gemini-1.5-flash, probamos con gemini-pro como respaldo automático
+        try:
+            m_alt = genai.GenerativeModel('gemini-pro')
+            res_alt = m_alt.generate_content(prompt_final)
+            return res_alt.text.strip()
+        except Exception as ex:
+            return f"Lo siento {usuario.get('corto', 'Mario')}, tuve un problema de conexión con la API: {str(e)}"
 
 # ==========================================
 # RUTAS DE FLASK Y FRONTEND
@@ -129,21 +133,16 @@ def home():
         #login { position: fixed; inset: 0; z-index: 100; background: rgba(2, 6, 23, 0.96); display: flex; align-items: center; justify-content: center; padding: 20px; }
         #box { background: #0f172a; border: 2px solid #ffd700; border-radius: 24px; padding: 28px; width: 100%; max-width: 340px; text-align: center; box-shadow: 0 0 30px rgba(0,0,0,0.8); }
         .pin { width: 100%; padding: 14px; border-radius: 14px; border: 1px solid #334155; text-align: center; font-size: 24px; letter-spacing: 8px; margin: 16px 0; background: #020617; color: #ffd700; outline: none; }
-        #yt { position: absolute; width: 1px; height: 1px; opacity: 0.01; pointer-events: none; }
-        video.cam { position: absolute; width: 70px; height: 50px; border-radius: 8px; border: 1px solid #ffd700; bottom: 10px; background: #000; object-fit: cover; }
     </style>
 </head>
 <body>
 <div id="foto">
-    <img id="astra" src="/astra.png" onerror="this.src='https://via.placeholder.com/400/020617/FFD700?text=ASTRA+FR'">
+    <img id="astra" src="/astra.png">
     <div id="topbar">
         <div class="chip" id="chipUser">ASTRA FR</div>
         <div class="chip" id="chipKm">Kwid: 0.0 km</div>
         <div class="chip" id="chipHora">--:--</div>
     </div>
-    <video id="cam1" autoplay muted class="cam" style="left:10px"></video>
-    <video id="cam2" autoplay muted class="cam" style="right:10px"></video>
-    <iframe id="yt" allow="autoplay"></iframe>
 </div>
 
 <div id="panel">
@@ -173,7 +172,7 @@ def home():
 </div>
 
 <script>
-let USER = null, KM_TOTAL = 0, WATCH = null, ULT_POS = null, MIC_CONTINUO = false, RECONOCEDOR = null;
+let USER = null, KM_TOTAL = 0, MIC_CONTINUO = false, RECONOCEDOR = null;
 const USUARIOS = {
     "2208": { "nombre": "Mario", "corto": "Mario", "rol": "admin" },
     "2345": { "nombre": "Paola", "corto": "Pao", "rol": "esposa" },
@@ -214,16 +213,12 @@ function login() {
     }
     USER = USUARIOS[pin];
     USER.pin = pin;
-    KM_TOTAL = parseFloat(localStorage.getItem('astra_km_' + pin) || '0');
     document.getElementById('login').style.display = 'none';
     document.getElementById('chipUser').innerText = USER.nombre + ' (' + USER.rol + ')';
-    document.getElementById('chipKm').innerText = 'Kwid: ' + KM_TOTAL.toFixed(1) + ' km';
     add('Sistema: Conectado como ' + USER.nombre, 'sistema');
 
-    if (USER.pin == '2208') hablar('Hola Mario. Gemini activo en mi núcleo. Di buenos días Astra para conectar GPS o pregúntame lo que quieras.');
-    else if (USER.pin == '2345') hablar('Hola Pao linda. Ya me conecté con inteligencia real, hablemos de lo que quieras.');
-    else if (USER.pin == '2011') hablar('Qué más Dur. Listo para responder tus dudas y explicarte temas bacanos.');
-    else if (USER.pin == '2015') hablar('Hola Made hermosa. Lista para charlar contigo.');
+    if (USER.pin == '2208') hablar('Hola Mario. Astra lista en el sistema.');
+    else hablar('Hola ' + USER.corto + ', lista para ayudarte.');
     
     iniciarReloj();
 }
@@ -248,46 +243,12 @@ async function enviar() {
     if (!txt) return;
     input.value = '';
     add('Tú: ' + txt, 'yo');
-    let low = txt.toLowerCase();
 
     if (!USER) {
         add('Por favor ingresa tu PIN de seguridad.', 'sistema');
         return;
     }
 
-    // Comandos directos del sistema (Acciones)
-    if (low.includes('buenos dias') || low.includes('iniciamos labores')) {
-        hablar('Buenos días ' + USER.corto + '. Conectando GPS para auditoría de kilometraje del Kwid 2026.');
-        iniciarGPS();
-        iniciarCamaras();
-        return;
-    }
-
-    if (low.includes('gaste') || low.includes('servicio') || low.includes('aeropuerto')) {
-        fetch('/guardar', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tipo: 'servicio', texto: txt, pin: USER.pin, fecha: new Date().toISOString(), km: KM_TOTAL })
-        });
-        hablar('Registrado en bitácora ' + USER.corto + ': ' + txt);
-        return;
-    }
-
-    if (low.includes('pon') && (low.includes('musica') || low.includes('cancion') || low.includes('youtube'))) {
-        let q = encodeURIComponent(txt.replace(/pon|musica|cancion|youtube/gi, ''));
-        document.getElementById('yt').src = 'https://www.youtube.com/embed?listType=search&list=' + q + '&autoplay=1';
-        hablar('Reproduciendo música en segundo plano, ' + USER.corto);
-        return;
-    }
-
-    if (low.includes('ruta') || low.includes('trazame')) {
-        let dest = encodeURIComponent(txt.replace(/trazame|ruta/gi, ''));
-        window.open('https://www.google.com/maps/dir/?api=1&destination=' + dest, '_blank');
-        hablar('Trazando la mejor ruta disponible hacia ' + txt);
-        return;
-    }
-
-    // Consulta Inteligente a Gemini API (Para conversación libre, clases, tutoría, etc.)
     add('<i>Astra pensando...</i>', 'sistema');
     try {
         let res = await fetch('/preguntar', {
@@ -296,42 +257,14 @@ async function enviar() {
             body: JSON.stringify({ mensaje: txt, usuario: USER })
         });
         let data = await res.json();
-        // Limpiamos el mensaje de "pensando"
         let chat = document.getElementById('chat');
         if (chat.lastChild && chat.lastChild.classList.contains('sistema')) {
             chat.removeChild(chat.lastChild);
         }
         hablar(data.respuesta);
     } catch (e) {
-        hablar('Tuve un pequeño problema de señal conectándome a Gemini, Mario.');
+        hablar('Error de conexión con la API.');
     }
-}
-
-function iniciarGPS() {
-    if (!navigator.geolocation) { hablar('El dispositivo no soporta GPS.'); return; }
-    if (WATCH) navigator.geolocation.clearWatch(WATCH);
-    WATCH = navigator.geolocation.watchPosition(p => {
-        if (ULT_POS) {
-            let d = calcKM(ULT_POS.lat, ULT_POS.lon, p.coords.latitude, p.coords.longitude);
-            if (d < 0.5) {
-                KM_TOTAL += d;
-                localStorage.setItem('astra_km_' + USER.pin, KM_TOTAL);
-                document.getElementById('chipKm').innerText = 'Kwid: ' + KM_TOTAL.toFixed(1) + ' km';
-            }
-        }
-        ULT_POS = { lat: p.coords.latitude, lon: p.coords.longitude };
-    }, null, { enableHighAccuracy: true });
-}
-
-function calcKM(lat1, lon1, lat2, lon2) {
-    let R = 6371, dLat = (lat2 - lat1) * Math.PI / 180, dLon = (lon2 - lon1) * Math.PI / 180;
-    let a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function iniciarCamaras() {
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } }).then(s => document.getElementById('cam1').srcObject = s).catch(() => {});
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(s => document.getElementById('cam2').srcObject = s).catch(() => {});
 }
 
 function cargar(tab) {
@@ -341,15 +274,9 @@ function cargar(tab) {
             html = '<b>💰 Bitácora de Gastos y Servicios</b><br>';
             (d.servicios || []).slice(-8).reverse().forEach(s => html += `• ${new Date(s.fecha).toLocaleTimeString()} - ${s.texto}<br>`);
         } else if (tab === 'stats') {
-            let h = {};
-            (d.servicios || []).filter(s => /aeropuerto/i.test(s.texto)).forEach(s => {
-                let hr = new Date(s.fecha).getHours();
-                h[hr] = (h[hr] || 0) + 1;
-            });
-            let top = Object.entries(h).sort((a, b) => b[1] - a[1])[0];
-            html = '<b>📊 Estadísticas Aeropuerto</b><br>' + (top ? `Hora pico: ${top[0]}:00 con ${top[1]} servicios registrados.` : 'Sin datos acumulados.');
+            html = '<b>📊 Estadísticas Aeropuerto</b><br>Sin datos acumulados.';
         } else if (tab === 'kwid') {
-            html = `<b>🔧 Mantenimiento Kwid Intens 2026</b><br>Km actual: ${KM_TOTAL.toFixed(1)} km<br>• 10,000 km: Cambio de aceite y filtro<br>• 20,000 km: Pastillas de freno y líquidos<br>• 30,000 km: Bujías y refrigerante`;
+            html = `<b>🔧 Mantenimiento Kwid Intens 2026</b><br>Km actual: ${KM_TOTAL.toFixed(1)} km`;
         } else if (tab === 'familia') {
             html = '<b>👨‍👩‍👧‍👦 Mensajes Centrales</b><br>';
             (d.mensajes || []).slice(-6).reverse().forEach(m => html += `• <b>${m.de}:</b> ${m.texto}<br>`);
@@ -398,13 +325,14 @@ def preguntar():
     respuesta = generar_respuesta_gemini(usuario, mensaje)
     return jsonify({"respuesta": respuesta})
 
-@app.route('/guardar', methods=['POST'])
-def guardar():
-    data = request.json
-    db = get_db()
-    if data.get('tipo') == 'servicio': db['servicios'].append(data)
-    elif data.get('tipo') == 'mensaje': db.setdefault('mensajes', []).append(data)
-    elif data.get('tipo') == 'funcion': db.setdefault('funciones', []).append(data.get('texto'))
-    elif data.get('tipo') == 'alerta': db.setdefault('alertas', []).append(data)
-    save_db(db)
-    return
+@app.route('/datos')
+def datos():
+    return jsonify(get_db())
+
+@app.route('/<path:path>')
+def static_files(path):
+    return send_from_directory('.', path)
+
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
