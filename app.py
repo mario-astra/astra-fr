@@ -15,8 +15,8 @@ try:
     from google import genai
     client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
     def generar(p):
-        try: return client.models.generate_content(model="gemini-2.0-flash", contents=p).text.strip()
-        except: return client.models.generate_content(model="gemini-1.5-flash", contents=p).text.strip()
+        try: return client.models.generate_content(model="gemini-2.5-flash", contents=p).text.strip()
+        except: return client.models.generate_content(model="gemini-2.5-flash", contents=p).text.strip()
 except:
     def generar(p): return f"Socio, me dijiste {p[-60:]} [MUSICA: feid]"
 
