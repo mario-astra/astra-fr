@@ -1,6 +1,6 @@
 from flask import Flask, send_from_directory, request, jsonify
 import os, json, datetime
-import google.generativeai as genai
+from google import genai
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 DB_FILE = "astra_db.json"
@@ -9,17 +9,17 @@ DB_FILE = "astra_db.json"
 # CONFIGURACIÓN DE GEMINI API
 # ==========================================
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+client = None
+gemini_activo = False
 
 try:
     if GEMINI_API_KEY:
-        genai.configure(api_key=GEMINI_API_KEY)
-        # Modelo compatible probado para la API v1/v1beta
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        client = genai.Client(api_key=GEMINI_API_KEY)
         gemini_activo = True
     else:
         gemini_activo = False
 except Exception as e:
-    print(f"Error al configurar Gemini: {e}")
+    print(f"Error al configurar Gemini Client: {e}")
     gemini_activo = False
 
 # ==========================================
@@ -53,7 +53,7 @@ def save_db(data):
 # PROMPT Y PERSONALIDAD ASTRA
 # ==========================================
 def generar_respuesta_gemini(usuario, mensaje):
-    if not gemini_activo:
+    if not gemini_activo or not client:
         return f"Listo {usuario.get('corto', 'Mario')}, recibí tu mensaje: '{mensaje}'. (Modo local sin Gemini)."
 
     instrucciones_rol = ""
@@ -82,13 +82,14 @@ def generar_respuesta_gemini(usuario, mensaje):
 
     prompt_final = f"{system_prompt}\n\nMensaje de {usuario.get('nombre', 'Usuario')}: {mensaje}"
 
-    # Probar nombres de modelos compatibles para eliminar el 404
-    modelos_a_probar = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-exp']
+    modelos_a_probar = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']
     
     for m in modelos_a_probar:
         try:
-            mod = genai.GenerativeModel(m)
-            response = mod.generate_content(prompt_final)
+            response = client.models.generate_content(
+                model=m,
+                contents=prompt_final,
+            )
             if response and response.text:
                 return response.text.strip()
         except Exception as e:
@@ -280,7 +281,7 @@ function cargar(tab) {
         } else if (tab === 'kwid') {
             html = `<b>🔧 Mantenimiento Kwid Intens 2026</b><br>Km actual: ${KM_TOTAL.toFixed(1)} km`;
         } else if (tab === 'familia') {
-            html = '<b>👨‍‍👩‍👧‍👦 Mensajes Centrales</b><br>';
+            html = '<b>👨‍👩‍👧‍👦 Mensajes Centrales</b><br>';
             (d.mensajes || []).slice(-6).reverse().forEach(m => html += `• <b>${m.de}:</b> ${m.texto}<br>`);
         }
         document.getElementById('chat').innerHTML = '<div class="bubble astra">' + html + '</div>';
