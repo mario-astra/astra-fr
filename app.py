@@ -82,7 +82,8 @@ def generar_respuesta_gemini(usuario, mensaje):
 
     prompt_final = f"{system_prompt}\n\nMensaje de {usuario.get('nombre', 'Usuario')}: {mensaje}"
 
-    modelos_a_probar = ['gemini-3.8-flash', 'gemini-1.5-flash-latest']
+    # Modelos actualizados para evitar 404/503
+    modelos_a_probar = ['gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-2.0-flash']
     
     for m in modelos_a_probar:
         try:
@@ -252,6 +253,53 @@ async function enviar() {
         return;
     }
 
+    let txtLower = txt.toLowerCase();
+
+    // 1. Detección de Waze
+    if (txtLower.includes('waze') || (txtLower.includes('ruta') && !txtLower.includes('maps'))) {
+        let destino = txt.replace(/trazame|traza|una|ruta|a|al|hacia|en|waze|llevame/gi, '').trim();
+        if (!destino) destino = "Aeropuerto Jose Maria Cordova";
+        hablar('Abriendo Waze hacia ' + destino);
+        setTimeout(() => {
+            window.location.href = `https://waze.com/ul?q=${encodeURIComponent(destino)}&navigate=yes`;
+        }, 1500);
+        return;
+    }
+
+    // 2. Detección de Google Maps
+    if (txtLower.includes('maps') || txtLower.includes('google maps') || txtLower.includes('mapa')) {
+        let destino = txt.replace(/trazame|traza|una|ruta|a|al|hacia|en|google|maps|mapa|llevame/gi, '').trim();
+        if (!destino) destino = "Aeropuerto Jose Maria Cordova";
+        hablar('Navegando con Google Maps a ' + destino);
+        setTimeout(() => {
+            window.location.href = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destino)}`;
+        }, 1500);
+        return;
+    }
+
+    // 3. Detección de Spotify
+    if (txtLower.includes('spotify') || txtLower.includes('cancion') || (txtLower.includes('pon') && !txtLower.includes('youtube')) || txtLower.includes('musica')) {
+        let busqueda = txt.replace(/pon|ponme|reproduce|reproduci|una|cancion|musica|de|en|spotify/gi, '').trim();
+        if (!busqueda) busqueda = "Karol G";
+        hablar('Buscando ' + busqueda + ' en Spotify');
+        setTimeout(() => {
+            window.location.href = `spotify://search/${encodeURIComponent(busqueda)}`;
+        }, 1500);
+        return;
+    }
+
+    // 4. Detección de YouTube
+    if (txtLower.includes('youtube') || txtLower.includes('video')) {
+        let busqueda = txt.replace(/pon|ponme|reproduce|un|video|en|youtube|de/gi, '').trim();
+        if (!busqueda) busqueda = "Salsa romantica";
+        hablar('Abriendo YouTube con ' + busqueda);
+        setTimeout(() => {
+            window.location.href = `https://www.youtube.com/results?search_query=${encodeURIComponent(busqueda)}`;
+        }, 1500);
+        return;
+    }
+
+    // Consulta estándar a la API de Gemini
     add('<i>Astra pensando...</i>', 'sistema');
     try {
         let res = await fetch('/preguntar', {
