@@ -82,7 +82,7 @@ def generar_respuesta_gemini(usuario, mensaje):
 
     prompt_final = f"{system_prompt}\n\nMensaje de {usuario.get('nombre', 'Usuario')}: {mensaje}"
 
-    modelos_a_probar = ['gemini-3.8-flash', 'gemini-1.5-flash']
+    modelos_a_probar = ['gemini-3.8-flash', 'gemini-1.5-flash-latest']
     
     for m in modelos_a_probar:
         try:
