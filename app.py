@@ -1,4 +1,4 @@
-# app.py - ASTRA FR - Socio Seba y Mario - 6 OCT 2026 - BLINDADO
+# app.py - ASTRA FR - FINAL BLINDADO 6 OCT 2026 - RUTA CORREGIDA
 from flask import Flask, send_from_directory, request, jsonify
 import os, json, requests, base64
 from google import genai
@@ -24,18 +24,19 @@ def get_system_status():
     except: return {"status":"activo","pending_feature":None}
 
 def set_system_status(status, pending_feature=None):
-    try: supabase_client.table("system_status").update({"status":status,"pending_feature":pending_feature}).eq("id",1).execute()
+    try:
+        supabase_client.table("system_status").update({"status":status,"pending_feature":pending_feature}).eq("id",1).execute()
     except: pass
 
 def push_a_github(nuevo_contenido, commit_msg):
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/astra-fr/app.py"
-    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
-    r = requests.get(url, headers=headers)
+    h = {"Authorization": f"token {GITHUB_TOKEN}"}
+    r = requests.get(url, headers=h)
     sha = r.json().get("sha")
     if not sha: return False, "No SHA"
     b64 = base64.b64encode(nuevo_contenido.encode("utf-8")).decode()
     data = {"message": commit_msg, "content": b64, "sha": sha}
-    r2 = requests.put(url, headers=headers, json=data)
+    r2 = requests.put(url, headers=h, json=data)
     return (True,"OK") if r2.status_code in [200,201] else (False,r2.text)
 
 def obtener_memoria_500_anos():
@@ -52,7 +53,7 @@ except: pass
 def generar_respuesta_gemini(usuario, mensaje):
     try:
         memoria = obtener_memoria_500_anos()
-        prompt = f"Eres ASTRA. Memoria: {memoria}. SEBA es socio oficial 6 oct 2026. Usuario {usuario.get('nombre')}: {mensaje}"
+        prompt = f"Eres ASTRA Kwid. Memoria: {memoria}. SEBA socio oficial. Usuario {usuario.get('nombre')}: {mensaje}"
         return client.models.generate_content(model='gemini-2.0-flash', contents=prompt).text.strip()
     except: return f"Recibi: {mensaje}"
 
@@ -63,7 +64,19 @@ def get_db():
 
 @app.route("/")
 def home():
-    return send_from_directory("astra-fr", "index.html")
+    # CORREGIDO: busca index donde sea
+    if os.path.exists("index.html"):
+        return send_from_directory(".", "index.html")
+    if os.path.exists("astra-fr/index.html"):
+        return send_from_directory("astra-fr", "index.html")
+    # Si no hay index, carga interfaz de emergencia para que no salga Not Found
+    return """<!DOCTYPE html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>ASTRA FR</title>
+    <style>body{background:#020617;color:#fff;font-family:system-ui;display:flex;flex-direction:column;height:100vh;margin:0}#chat{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px}.b{padding:10px 14px;border-radius:14px;max-width:85%}.yo{align-self:flex-end;background:#ffd700;color:#020617}.as{align-self:flex-start;background:#1e293b;border:1px solid #ffd700}#bar{display:flex;gap:8px;padding:10px;background:#0f172a}input{flex:1;padding:12px;border-radius:24px;border:1px solid #334155;background:#020617;color:#fff}</style></head>
+    <body><div style="padding:12px;text-align:center;color:#ffd700;font-weight:bold">ASTRA FR - MODO EMERGENCIA OK</div><div id=chat></div>
+    <div id=bar><input id=t placeholder="Escribe..."><button onclick=env() style="background:#ffd700;border:none;border-radius:50%;width:44px;height:44px">➤</button></div>
+    <script>let U={nombre:"Mario",rol:"admin",pin:"2208"};function add(txt,c){let ch=document.getElementById('chat');let d=document.createElement('div');d.className='b '+c;d.innerHTML=txt;ch.appendChild(d);ch.scrollTop=ch.scrollHeight}
+    async function env(){let i=document.getElementById('t');let tx=i.value.trim();if(!tx)return;i.value='';add(tx,'yo');let r=await fetch('/preguntar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mensaje:tx,usuario:U})});let d=await r.json();add(d.respuesta,'as')}
+    add('Astra conectada en modo emergencia. Prueba: Astra actualizate y queda en neutro','as');</script></body></html>"""
 
 @app.route("/preguntar", methods=["POST"])
 def preguntar():
@@ -72,35 +85,32 @@ def preguntar():
     usuario = data.get("usuario",{})
     estado = get_system_status()
     ml = msg.lower()
-
     if estado.get("status")=="neutro":
         if "cancelar" in ml:
             set_system_status("activo",None)
-            return jsonify({"respuesta":"Sali de neutro sin cambios."})
+            return jsonify({"respuesta":"Sali de neutro."})
         if estado.get("pending_feature") and ("si, autorizo" in ml or "sí, autorizo" in ml):
             with open(__file__,"r",encoding="utf-8") as f: codigo=f.read()
-            prompt_code = f"Añade funcion: {estado.get('pending_feature')} a este app.py. Devuelve SOLO codigo:\n{codigo[:12000]}"
-            nuevo = client.models.generate_content(model='gemini-2.0-flash', contents=prompt_code).text.replace("```python","").replace("```","").strip()
-            ok,det = push_a_github(nuevo, f"Auto-update: {estado.get('pending_feature')}")
+            pc = f"Añade: {estado.get('pending_feature')} a este codigo. Solo codigo:\n{codigo[:12000]}"
+            nuevo = client.models.generate_content(model='gemini-2.0-flash', contents=pc).text.replace("```python","").replace("```","").strip()
+            ok,det = push_a_github(nuevo, f"Auto: {estado.get('pending_feature')}")
             set_system_status("activo",None)
-            return jsonify({"respuesta": f"LISTO! Push {det}" if ok else f"Fallo {det}"})
+            return jsonify({"respuesta": f"LISTO Push {det}" if ok else f"Fallo {det}"})
         if not estado.get("pending_feature"):
             set_system_status("neutro",msg)
-            return jsonify({"respuesta": f"Quede en NEUTRO con: '{msg}'. Di SI, AUTORIZO"})
+            return jsonify({"respuesta": f"Quede en NEUTRO con '{msg}'. Di SI, AUTORIZO"})
         else:
-            return jsonify({"respuesta": f"Pendiente: {estado.get('pending_feature')}. Di SI, AUTORIZO"})
-
+            return jsonify({"respuesta": f"Pendiente {estado.get('pending_feature')}. Di SI, AUTORIZO"})
     if "actualizate y queda en neutro" in ml or "actualízate y queda en neutro" in ml:
         set_system_status("neutro",None)
         return jsonify({"respuesta":"Quede en NEUTRO, dime la funcion."})
-
     return jsonify({"respuesta": generar_respuesta_gemini(usuario, msg)})
 
 @app.route("/datos")
 def datos(): return jsonify(get_db())
-
 @app.route("/<path:path>")
-def static_files(path): return send_from_directory(".", path)
+def static_files(path):
+    return send_from_directory(".", path)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT",10000)))
