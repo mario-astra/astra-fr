@@ -1,3 +1,6 @@
-google-genai
-Flask
-gunicorn
+fastapi
+uvicorn
+python-multipart
+pydantic
+supabase
+python-dotenv
