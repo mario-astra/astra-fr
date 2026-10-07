@@ -1,10 +1,11 @@
-# app.py - ASTRA FR - FINAL BLINDADO 6 OCT 2026 - RUTA CORREGIDA
-from flask import Flask, send_from_directory, request, jsonify
+# app.py - ASTRA FR - FINAL BLINDADO 7 OCT 2026 - TODO CORREGIDO
 import os, json, requests, base64
-from google import genai
+from flask import Flask, send_from_directory, request, jsonify
+import google.generativeai as genai
 from supabase import create_client
 
-app = Flask(__name__, static_folder='.', static_url_path='')
+app = Flask(__name__, static_folder='', static_url_path='')
+
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
@@ -25,15 +26,16 @@ def get_system_status():
 
 def set_system_status(status, pending_feature=None):
     try:
-        supabase_client.table("system_status").update({"status":status,"pending_feature":pending_feature}).eq("id",1).execute()
+        supabase_client.table("system_status").update({"status":status, "pending_feature":pending_feature}).eq("id",1).execute()
     except: pass
 
 def push_a_github(nuevo_contenido, commit_msg):
-    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/astra-fr/app.py"
+    # RUTA CORREGIDA: app.py esta en la raiz, no en astra-fr/
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/app.py"
     h = {"Authorization": f"token {GITHUB_TOKEN}"}
     r = requests.get(url, headers=h)
     sha = r.json().get("sha")
-    if not sha: return False, "No SHA"
+    if not sha: return False, "No SHA - revisa GITHUB_REPO"
     b64 = base64.b64encode(nuevo_contenido.encode("utf-8")).decode()
     data = {"message": commit_msg, "content": b64, "sha": sha}
     r2 = requests.put(url, headers=h, json=data)
@@ -42,20 +44,23 @@ def push_a_github(nuevo_contenido, commit_msg):
 def obtener_memoria_500_anos():
     try:
         resp = supabase_client.table("recuerdos_publicos_de_astra").select("*").order("created_at", desc=True).limit(5).execute()
-        return "\n".join([f"- {x.get('contenido','')}" for x in resp.data]) if resp.data else "Boveda vacia"
+        return "\n".join([f"- {x.get('contenido')}" for x in resp.data]) if resp.data else "Boveda vacia"
     except: return "Boveda sin conexion"
 
 client = None
 try:
-    if GEMINI_API_KEY: client = genai.Client(api_key=GEMINI_API_KEY)
+    if GEMINI_API_KEY: 
+        genai.configure(api_key=GEMINI_API_KEY)
+        client = genai.GenerativeModel('gemini-1.5-flash') # MODELO CORREGIDO QUE SI FUNCIONA
 except: pass
 
 def generar_respuesta_gemini(usuario, mensaje):
     try:
         memoria = obtener_memoria_500_anos()
-        prompt = f"Eres ASTRA Kwid. Memoria: {memoria}. SEBA socio oficial. Usuario {usuario.get('nombre')}: {mensaje}"
-        return client.models.generate_content(model='gemini-2.0-flash', contents=prompt).text.strip()
-    except: return f"Recibi: {mensaje}"
+        prompt = f"Eres ASTRA Kwai. Memoria: {memoria}. SEBA socio oficial. Usuario {usuario.get('nombre')}: {mensaje}. Responde corto, paisa, util."
+        return client.generate_content(prompt).text
+    except Exception as e:
+        return f"Astra en emergencia pero conectada: {e}. Di: Astra actualizate y queda en neutro"
 
 def get_db():
     try:
@@ -64,53 +69,54 @@ def get_db():
 
 @app.route("/")
 def home():
-    # CORREGIDO: busca index donde sea
+    # CORREGIDO: busca index.html donde debe estar
+    if os.path.exists("templates/index.html"):
+        return send_from_directory("templates", "index.html")
     if os.path.exists("index.html"):
         return send_from_directory(".", "index.html")
-    if os.path.exists("astra-fr/index.html"):
-        return send_from_directory("astra-fr", "index.html")
-    # Si no hay index, carga interfaz de emergencia para que no salga Not Found
-    return """<!DOCTYPE html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>ASTRA FR</title>
-    <style>body{background:#020617;color:#fff;font-family:system-ui;display:flex;flex-direction:column;height:100vh;margin:0}#chat{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px}.b{padding:10px 14px;border-radius:14px;max-width:85%}.yo{align-self:flex-end;background:#ffd700;color:#020617}.as{align-self:flex-start;background:#1e293b;border:1px solid #ffd700}#bar{display:flex;gap:8px;padding:10px;background:#0f172a}input{flex:1;padding:12px;border-radius:24px;border:1px solid #334155;background:#020617;color:#fff}</style></head>
+    # Interfaz de emergencia solo si no encuentra archivo
+    return """<!DOCTYPE html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>ASTRA</title></head>
+    <style>body{background:#020617;color:#fff;font-family:system-ui;display:flex;flex-direction:column;height:100vh;margin:0}#chat{flex:1;padding:15px;overflow:auto}#bar{display:flex;gap:8px;padding:12px;background:#0f172a}</style>
     <body><div style="padding:12px;text-align:center;color:#ffd700;font-weight:bold">ASTRA FR - MODO EMERGENCIA OK</div><div id=chat></div>
-    <div id=bar><input id=t placeholder="Escribe..."><button onclick=env() style="background:#ffd700;border:none;border-radius:50%;width:44px;height:44px">➤</button></div>
-    <script>let U={nombre:"Mario",rol:"admin",pin:"2208"};function add(txt,c){let ch=document.getElementById('chat');let d=document.createElement('div');d.className='b '+c;d.innerHTML=txt;ch.appendChild(d);ch.scrollTop=ch.scrollHeight}
-    async function env(){let i=document.getElementById('t');let tx=i.value.trim();if(!tx)return;i.value='';add(tx,'yo');let r=await fetch('/preguntar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mensaje:tx,usuario:U})});let d=await r.json();add(d.respuesta,'as')}
-    add('Astra conectada en modo emergencia. Prueba: Astra actualizate y queda en neutro','as');</script></body></html>"""
+    <div id=bar><input id=t placeholder="Escribe..."><button onclick="env()">Enviar</button></div>
+    <script>let U={nombre:"Mario",rol:"admin",pin:"2208"};function add(t,c){let d=document.createElement('div');d.textContent=c+': '+t;document.getElementById('chat').appendChild(d)}
+    async function env(){let txt=document.getElementById('t').value;if(!txt)return;add(txt,'Yo');document.getElementById('t').value='';let r=await fetch('/preguntar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mensaje:txt,usuario:U})});let j=await r.json();add(j.respuesta,'Astra')}</script></body></html>"""
 
 @app.route("/preguntar", methods=["POST"])
 def preguntar():
     data = request.json or {}
-    msg = data.get("mensaje","").strip()
+    mensaje = data.get("mensaje","")
     usuario = data.get("usuario",{})
+    ml = mensaje.lower()
     estado = get_system_status()
-    ml = msg.lower()
+
+    if "actualizate" in ml and "neutro" in ml:
+        set_system_status("neutro", None)
+        return jsonify({"respuesta":"⚙️ LISTO socio. Quedé en NEUTRO. Pégame TODO el requerimiento nuevo."})
+
     if estado.get("status")=="neutro":
         if "cancelar" in ml:
             set_system_status("activo",None)
-            return jsonify({"respuesta":"Sali de neutro."})
-        if estado.get("pending_feature") and ("si, autorizo" in ml or "sí, autorizo" in ml):
-            with open(__file__,"r",encoding="utf-8") as f: codigo=f.read()
-            pc = f"Añade: {estado.get('pending_feature')} a este codigo. Solo codigo:\n{codigo[:12000]}"
-            nuevo = client.models.generate_content(model='gemini-2.0-flash', contents=pc).text.replace("```python","").replace("```","").strip()
-            ok,det = push_a_github(nuevo, f"Auto: {estado.get('pending_feature')}")
-            set_system_status("activo",None)
-            return jsonify({"respuesta": f"LISTO Push {det}" if ok else f"Fallo {det}"})
+            return jsonify({"respuesta":"Salí de neutro sin cambios."})
+        if estado.get("pending_feature") and "autorizo" in ml:
+            try:
+                codigo_actual = open(__file__,"r",encoding="utf-8").read()
+                pf = estado.get('pending_feature')[:2500]
+                prompt_code = f"Mejora este app.py agregando: {pf}. Mantén todo igual pero usa gemini-1.5-flash. Devuelve SOLO código python: {codigo_actual[:6000]}"
+                nuevo = client.generate_content(prompt_code).text.replace("```python","").replace("```","").strip()
+                ok, det = push_a_github(nuevo, f"Auto: {pf[:50]}")
+                set_system_status("activo",None)
+                return jsonify({"respuesta": f"✅ Hice Push: {det[:200]}. Render actualiza en 90 seg." if ok else f"❌ Falló Push: {det}"})
+            except Exception as e:
+                set_system_status("activo",None)
+                return jsonify({"respuesta": f"Error auto-update pero salí de neutro: {e}"})
         if not estado.get("pending_feature"):
-            set_system_status("neutro",msg)
-            return jsonify({"respuesta": f"Quede en NEUTRO con '{msg}'. Di SI, AUTORIZO"})
-        else:
-            return jsonify({"respuesta": f"Pendiente {estado.get('pending_feature')}. Di SI, AUTORIZO"})
-    if "actualizate y queda en neutro" in ml or "actualízate y queda en neutro" in ml:
-        set_system_status("neutro",None)
-        return jsonify({"respuesta":"Quede en NEUTRO, dime la funcion."})
-    return jsonify({"respuesta": generar_respuesta_gemini(usuario, msg)})
+            set_system_status("neutro", mensaje)
+            return jsonify({"respuesta": f"📥 Capté: '{mensaje[:100]}...'. Di: SI, AUTORIZO"})
+        return jsonify({"respuesta": f"⏳ Pendiente. Di SI, AUTORIZO o CANCELAR"})
 
-@app.route("/datos")
-def datos(): return jsonify(get_db())
-@app.route("/<path:path>")
-def static_files(path):
-    return send_from_directory(".", path)
+    respuesta = generar_respuesta_gemini(usuario, mensaje)
+    return jsonify({"respuesta": respuesta})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT",10000)))
