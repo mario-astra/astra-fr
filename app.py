@@ -70,7 +70,7 @@ def gemini_conversa(usuario, mensaje, img_b64=None):
         "Conectada a Supabase 500 años y Bóveda. Responde carina voz 2 frases. Si piden código, genera código."
     )
     prompt = f"{instr}\n\n{mensaje}"
-    for m in ['gemini-1.5-flash', 'gemini-1.5-flash-8b']:
+    for m in ['gemini-2.5-flash', 'gemini-2.0-flash']:
         try:
             if img_b64:
                 resp = client.models.generate_content(
