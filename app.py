@@ -72,7 +72,7 @@ def gemini_conversa(usuario, mensaje, img_b64=None):
     prompt = f"{instr}\n\n{mensaje}"
     
     # Lista de fallback robusta para AI Studio (API_KEY formato AQ...)
-MODELOS_FALLBACK = [
+    MODELOS_FALLBACK = [
     'gemini-2.5-flash',
     'gemini-flash-latest',
     'gemini-2.0-flash',
@@ -81,7 +81,7 @@ MODELOS_FALLBACK = [
 
     ]
 
-    for m in modelos_fallback:
+    for m in MODELOS_FaLLBACK:
         try:
             if img_b64:
                 resp = client.models.generate_content(
