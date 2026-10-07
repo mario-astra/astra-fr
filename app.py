@@ -1,122 +1,375 @@
-# app.py - ASTRA FR - FINAL BLINDADO 7 OCT 2026 - TODO CORREGIDO
-import os, json, requests, base64
-from flask import Flask, send_from_directory, request, jsonify
-import google.generativeai as genai
-from supabase import create_client
+import os, json, base64, datetime, traceback, requests
+from flask import Flask, request, jsonify, render_template_string, send_from_directory
+from google import genai
+from google.genai import types
 
-app = Flask(__name__, static_folder='', static_url_path='')
+app = Flask(__name__)
+DB_FILE = "astra_db.json"
 
+# GEMINI
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
+
+# SUPABASE - MEMORIA POR 500 AÑOS
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
+
+def supabase_save(tabla, data):
+    if not SUPABASE_URL or not SUPABASE_KEY: return False
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/{tabla}"
+        headers = {
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "application/json",
+            "Prefer": "return=representation"
+        }
+        r = requests.post(url, headers=headers, json=data, timeout=5)
+        return r.status_code in [200, 201]
+    except Exception as e:
+        print(f"Supabase save error: {e}")
+        return False
+
+# GITHUB AUTO-PUSH - FUNCION AUTOPILOTO
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 GITHUB_REPO = os.environ.get("GITHUB_REPO", "")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-
-supabase_client = None
-try:
-    if SUPABASE_URL and SUPABASE_KEY:
-        supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
-except: pass
-
-def get_system_status():
+def auto_push_path(path, context, msg):
+    if not GITHUB_TOKEN or not GITHUB_REPO: return False
     try:
-        r = supabase_client.table("system_status").select("*").eq("id",1).single().execute()
-        return r.data
-    except: return {"status":"activo","pending_feature":None}
-
-def set_system_status(status, pending_feature=None):
-    try:
-        supabase_client.table("system_status").update({"status":status, "pending_feature":pending_feature}).eq("id",1).execute()
-    except: pass
-
-def push_a_github(nuevo_contenido, commit_msg):
-    # RUTA CORREGIDA: app.py esta en la raiz, no en astra-fr/
-    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/app.py"
-    h = {"Authorization": f"token {GITHUB_TOKEN}"}
-    r = requests.get(url, headers=h)
-    sha = r.json().get("sha")
-    if not sha: return False, "No SHA - revisa GITHUB_REPO"
-    b64 = base64.b64encode(nuevo_contenido.encode("utf-8")).decode()
-    data = {"message": commit_msg, "content": b64, "sha": sha}
-    r2 = requests.put(url, headers=h, json=data)
-    return (True,"OK") if r2.status_code in [200,201] else (False,r2.text)
-
-def obtener_memoria_500_anos():
-    try:
-        resp = supabase_client.table("recuerdos_publicos_de_astra").select("*").order("created_at", desc=True).limit(5).execute()
-        return "\n".join([f"- {x.get('contenido')}" for x in resp.data]) if resp.data else "Boveda vacia"
-    except: return "Boveda sin conexion"
-
-client = None
-try:
-    if GEMINI_API_KEY: 
-        genai.configure(api_key=GEMINI_API_KEY)
-        client = genai.GenerativeModel('gemini-1.5-flash') # MODELO CORREGIDO QUE SI FUNCIONA
-except: pass
-
-def generar_respuesta_gemini(usuario, mensaje):
-    try:
-        memoria = obtener_memoria_500_anos()
-        prompt = f"Eres ASTRA Kwai. Memoria: {memoria}. SEBA socio oficial. Usuario {usuario.get('nombre')}: {mensaje}. Responde corto, paisa, util."
-        return client.generate_content(prompt).text
+        import base64 as b64
+        url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{path}"
+        headers = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+        r = requests.get(url, headers=headers)
+        sha = r.json().get('sha') if r.status_code == 200 else None
+        data = {"message": msg, "content": b64.b64encode(context.encode()).decode(), "branch": "main"}
+        if sha: data["sha"] = sha
+        requests.put(url, headers=headers, json=data, timeout=10)
+        return True
     except Exception as e:
-        return f"Astra en emergencia pero conectada: {e}. Di: Astra actualizate y queda en neutro"
+        print(f"Github push error: {e}")
+        return False
 
+# DB LOCAL
 def get_db():
+    if not os.path.exists(DB_FILE):
+        return {"mensajes": [], "memoria": []}
     try:
-        with open("astra_db.json","r") as f: return json.load(f)
-    except: return {"servicios":[]}
+        with open(DB_FILE, "r", encoding="utf-8") as f: return json.load(f)
+    except: return {"mensajes": [], "memoria": []}
 
-@app.route("/")
-def home():
-    # CORREGIDO: busca index.html donde debe estar
-    if os.path.exists("templates/index.html"):
-        return send_from_directory("templates", "index.html")
-    if os.path.exists("index.html"):
-        return send_from_directory(".", "index.html")
-    # Interfaz de emergencia solo si no encuentra archivo
-    return """<!DOCTYPE html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>ASTRA</title></head>
-    <style>body{background:#020617;color:#fff;font-family:system-ui;display:flex;flex-direction:column;height:100vh;margin:0}#chat{flex:1;padding:15px;overflow:auto}#bar{display:flex;gap:8px;padding:12px;background:#0f172a}</style>
-    <body><div style="padding:12px;text-align:center;color:#ffd700;font-weight:bold">ASTRA FR - MODO EMERGENCIA OK</div><div id=chat></div>
-    <div id=bar><input id=t placeholder="Escribe..."><button onclick="env()">Enviar</button></div>
-    <script>let U={nombre:"Mario",rol:"admin",pin:"2208"};function add(t,c){let d=document.createElement('div');d.textContent=c+': '+t;document.getElementById('chat').appendChild(d)}
-    async function env(){let txt=document.getElementById('t').value;if(!txt)return;add(txt,'Yo');document.getElementById('t').value='';let r=await fetch('/preguntar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mensaje:txt,usuario:U})});let j=await r.json();add(j.respuesta,'Astra')}</script></body></html>"""
+def save_db(d):
+    with open(DB_FILE, "w", encoding="utf-8") as f: json.dump(d, f, ensure_ascii=False, indent=2)
 
-@app.route("/preguntar", methods=["POST"])
+def gemini_conversa(usuario, mensaje, img_b64=None):
+    if not client:
+        return "Falta configurar la GEMINI_API_KEY."
+    rol = usuario.get('rol', 'invitado')
+    instr = (
+        "Eres ASTRA FR v2 FINAL AUTO-ACTUALIZABLE. "
+        "Admin Mario (2208). Seba (0709), parcero técnico. Si te dicen 'Astra' responde primero 'Hola Mario, dime' y espera pedido. "
+        "Conectada a Supabase 500 años y Bóveda. Responde carina voz 2 frases. Si piden código, genera código."
+    )
+    prompt = f"{instr}\n\n{mensaje}"
+    for m in ['gemini-2.0-flash', 'gemini-1.5-flash']:
+        try:
+            if img_b64:
+                resp = client.models.generate_content(
+                    model=m,
+                    contents=[types.Part.from_bytes(data=base64.b64decode(img_b64), mime_type="image/jpeg"), prompt]
+                )
+            else:
+                resp = client.models.generate_content(model=m, contents=prompt)
+            if resp and resp.text: return resp.text
+        except Exception as e:
+            print(f"Error {m}: {str(e)}")
+            continue
+    return "No pude conectar a Gemini, verifica GEMINI_API_KEY en Render."
+
+@app.route('/')
+def index():
+    html_content = """
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ASTRA FR - Final Auto-Actualizable</title>
+    <style>
+        :root { --bg: #020617; --gold: #ffd700; --gold-glow: rgba(255, 215, 0, 0.4); --panel: #0f172a; }
+        body { background: var(--bg); color: var(--gold); font-family: system-ui; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        .avatar-container { display: flex; flex-direction: column; align-items: center; padding: 10px; background: var(--panel); border-bottom: 1px solid rgba(255,215,0,0.2); }
+        .avatar-frame { width: 90px; height: 90px; border-radius: 50%; border: 2px solid var(--gold); overflow: hidden; box-shadow: 0 0 15px var(--gold-glow); position: relative; }
+        .avatar-frame img, .avatar-frame video { width: 100%; height: 100%; object-fit: cover; }
+        @keyframes talk { 0% { height: 5px; } 50% { height: 15px; } 100% { height: 5px; } }
+        .mouth-position { position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); width: 20px; height: 5px; background: #ff55a5; border-radius: 20px; display: none; }
+        .avatar-frame.talk .mouth-position { display: block; animation: talk 0.18s infinite; }
+        /* burbuja ube/movil */
+        #uberBubble { position: fixed; bottom: 80px; right: 20px; width: 60px; height: 60px; background: radial-gradient(circle, #0f172a, #ffd700); border: 2px solid var(--gold); border-radius: 50%; box-shadow: 0 0 20px var(--gold-glow); display: flex; justify-content: center; align-items: center; cursor: pointer; z-index: 9998; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        .uberBubble.listening { animation: pulse 1s infinite; border-color: #ef4444; }
+        /* chat */
+        .chat-container { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
+        .message { max-width: 80%; padding: 12px 16px; border-radius: 12px; font-size: 14px; line-height: 1.4; word-break: break-word; }
+        .user-msg { background: #1e293b; color: #fff; align-self: flex-end; border: 1px solid rgba(255,215,0,0.3); }
+        .astra-msg { background: #0f172a; color: var(--gold); align-self: flex-start; border: 1px solid var(--gold); font-weight: bold; }
+        /* input bar */
+        .input-bar { display: flex; align-items: center; padding: 10px; background: var(--panel); border-top: 1px solid rgba(255,215,0,0.2); gap: 8px; }
+        .btn-action { background: transparent; border: 1px solid var(--gold); color: var(--gold); border-radius: 50%; width: 40px; height: 40px; display: flex; justify-content: center; align-items: center; font-size: 18px; cursor: pointer; }
+        .chat-input { flex: 1; background: #0f172a; border: 1px solid rgba(255,215,0,0.4); color: #fff; padding: 10px 14px; border-radius: 20px; outline: none; }
+        #plusMenu { position: absolute; bottom: 65px; left: 10px; background: #0f172a; border: 1px solid var(--gold); border-radius: 10px; display: none; flex-direction: column; overflow: hidden; z-index: 1000; }
+        #plusMenu button { background: none; border: none; color: #fff; padding: 10px 15px; text-align: left; cursor: pointer; border-bottom: 1px solid rgba(255,215,0,0.1); }
+        #plusMenu button:hover { background: rgba(255,215,0,0.1); color: var(--gold); }
+    </style>
+</head>
+<body>
+
+    <!-- LOGIN -->
+    <div id="loginScreen" style="position:fixed; top:0; left:0; width:100%; height:100%; background:var(--bg); display:flex; flex-direction:column; justify-content:center; align-items:center; z-index:9999;">
+        <h2 style="color:var(--gold)">PIN 2208 Mario / 0709 Seba</h2>
+        <input type="password" id="pinInput" class="pin-input" maxlength="4" style="background:#0f172a; border:2px solid var(--gold); color:var(--gold); padding:12px; font-size:24px; text-align:center; border-radius:8px; width:150px; outline:none;" placeholder="••••">
+        <button onclick="verificarPin()" style="margin-top:15px; background:var(--gold); color:#020617; border:none; padding:10px 20px; border-radius:6px; font-weight:bold; cursor:pointer;">ACCEDER</button>
+    </div>
+
+    <!-- AVATAR -->
+    <div class="avatar-container">
+        <div id="avatarFrame" class="avatar-frame">
+            <img id="avatarImg" src="/static/astra.png" alt="Astra" onerror="this.src='https://i.imgur.com/8N4M8RU.png'">
+            <video id="avatarVideo" autoplay loop muted playsinline style="display:none"><source src="/static/astra-viva.mp4" type="video/mp4"></video>
+            <div class="mouth-position"></div>
+        </div>
+        <div id="status" style="font-size:12px; color:var(--gold); margin-top:5px;">Sistema en Línea - Memoria Supabase 500 Años</div>
+    </div>
+
+    <!-- CHAT -->
+    <div id="chat" class="chat-container">
+        <div class="message astra-msg">Hola Mario, dime. Activa FR FINAL lista.</div>
+    </div>
+
+    <!-- INPUT BAR -->
+    <div class="input-bar">
+        <div id="plusMenu">
+            <button onclick="pickFile()">📁 Archivo</button>
+            <button onclick="pickCam()">📷 Cámara</button>
+        </div>
+        <input type="file" id="fileInput" accept="image/*,video/*,pdf,.doc" style="display:none" onchange="handleFile(this)">
+        <input type="file" id="camInput" accept="image/*" capture="environment" style="display:none" onchange="handleFile(this)">
+        
+        <button class="btn-action" onclick="togglePlus()">+</button>
+        <input type="text" id="userInput" class="chat-input" placeholder="Astra o escribe...">
+        <button id="micBtn" class="btn-action" onclick="handleMic()">🎤</button>
+    </div>
+
+    <!-- BURBUJA -->
+    <div id="uberBubble" onclick="hablarHola()" title="Astra Activa">✨</div>
+
+<script>
+    let USR = {nombre: "Mario", rol: "admin"}, MODO_CHARLA = false, lastTap = 0, RECON = null, escuchando = false, imgB64 = null;
+    const USERS = [{pin: "2208", nombre: "Mario", rol: "admin"}, {pin: "0709", nombre: "Seba", rol: "seba"}, {pin: "2345", nombre: "Paola", rol: "invitado"}];
+
+    function hablar(txt) {
+        let f = document.getElementById('avatarFrame'); f.classList.add('talk');
+        let vid = document.getElementById('avatarVideo'); if (vid.src) { vid.style.display = 'block'; document.getElementById('avatarImg').style.display = 'none'; }
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            let s = new SpeechSynthesisUtterance(txt); s.lang = 'es-CO'; s.rate = 0.95;
+            s.onend = () => f.classList.remove('talk');
+            window.speechSynthesis.speak(s);
+        } else { setTimeout(() => f.classList.remove('talk'), 2000); }
+    }
+
+    function verificarPin() {
+        let p = document.getElementById('pinInput').value;
+        let u = USERS.find(x => x.pin === p);
+        if (u) {
+            USR = u;
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('uberBubble').style.display = 'flex';
+            hablar(`Hola ${USR.nombre}, dime.`);
+        } else { alert('PIN inválido'); }
+    }
+
+    function togglePlus() { let m = document.getElementById('plusMenu'); m.style.display = m.style.display === 'flex' ? 'none' : 'flex'; }
+    function pickFile() { document.getElementById('fileInput').click(); togglePlus(); }
+    function pickCam() { document.getElementById('camInput').click(); togglePlus(); }
+
+    function handleFile(input) {
+        if (!input.files || !input.files[0]) return;
+        let r = new FileReader();
+        r.onload = function(e) {
+            imgB64 = e.target.result.split(',')[1];
+            addChat("📁 Archivo adjuntado: " + input.files[0].name, 'user-msg');
+            enviarConImg(input.files[0].name, imgB64);
+        };
+        r.readAsDataURL(input.files[0]);
+    }
+
+    function handleMic() {
+        let now = new Date().getTime();
+        if (now - lastTap < 300) { extraTap(); } else { grabarVoz(); }
+        lastTap = now;
+    }
+
+    function grabarVoz() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if(!SpeechRecognition) { alert('Use Chrome'); return; }
+        let rec = new SpeechRecognition(); rec.lang = 'es-CO';
+        rec.onresult = (e) => { document.getElementById('userInput').value = e.results[0][0].transcript; enviar(); };
+        rec.start();
+    }
+
+    function extraTap() {
+        MODO_CHARLA = !MODO_CHARLA;
+        let bub = document.getElementById('uberBubble'), st = document.getElementById('status');
+        if (MODO_CHARLA) {
+            bub.classList.add('listening'); st.innerText = "MODO CHARLA - Solo escucha..."; st.style.color = "#ef4444";
+            iniciarModoEscuchaPasiva();
+        } else {
+            bub.classList.remove('listening'); st.innerText = "Sistema en Línea"; st.style.color = "var(--gold)";
+        }
+    }
+
+    function iniciarModoEscuchaPasiva() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if(!SpeechRecognition) return;
+        try {
+            let RECON_INT = new SpeechRecognition(); RECON_INT.continuous = true; RECON_INT.interimResults = true;
+            RECON_INT.onresult = (e) => {
+                let res = e.results[e.results.length - 1][0].transcript.toLowerCase();
+                if(res.includes('astra')) { hablar("Hola Mario, dime."); setTimeout(() => { escuchando = true; }, 2000); }
+                else if(escuchando && res.trim().length > 4) { document.getElementById('userInput').value = res; enviar(); escuchando = false; }
+            };
+            RECON_INT.onend = () => { if(MODO_CHARLA) RECON_INT.start(); };
+            RECON_INT.start();
+        } catch(e){}
+    }
+
+    function hablarHola() { hablar(`Hola ${USR.nombre}, dime.`); }
+
+    async function enviar() {
+        let input = document.getElementById('userInput'); let txt = input.value.trim(); if (!txt && !imgB64) return;
+        if(txt) addChat(txt, 'user-msg');
+        input.value = '';
+
+        if(txt.toLowerCase().includes('busca en waze')) {
+            let dest = txt.substring(13).trim() || "Aeropuerto Jose Maria Cordova";
+            addChat(`🗺️ [Waze Abierto: ${dest}]`, 'astra-msg');
+            document.body.innerHTML += `<iframe src="https://embed.waze.com/iframe?zoom=14&lat=6.1645&lon=-75.5862&pin=1" width="100%" height="250"></iframe>`;
+            hablar("Abriendo Waze hacia " + dest); return;
+        }
+        if(txt.toLowerCase().includes('busca en google maps') || txt.toLowerCase().includes('busca en mapas')) {
+            let dest = txt.replace('busca en google maps', '').replace('busca en mapas', '').trim() || "Medellin";
+            addChat(`🗺️ [Google Maps: ${dest}]`, 'astra-msg');
+            document.body.innerHTML += `<iframe src="https://www.google.com/maps/embed/v1/place?key=AIzaSyDummy&q=${encodeURIComponent(dest)}" width="100%" height="250"></iframe>`;
+            hablar("Abriendo en Google Maps " + dest); return;
+        }
+        if(txt.toLowerCase().includes('busca en spotify')) {
+            let q = txt.replace('busca en spotify', '').trim() || "Karol G";
+            addChat(`🎵 [Spotify: ${q}]`, 'astra-msg');
+            document.body.innerHTML += `<iframe src="https://open.spotify.com/embed/search/${encodeURIComponent(q)}" width="100%" height="152" allow="encrypted-media"></iframe>`;
+            hablar("Buscando en Spotify " + q); return;
+        }
+        if(txt.toLowerCase().includes('busca en youtube')) {
+            let q = txt.replace('busca en youtube', '').trim() || "Vallenato";
+            addChat(`📺 [YouTube: ${q}]`, 'astra-msg');
+            document.body.innerHTML += `<iframe src="https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(q)}" width="100%" height="250" allowfullscreen></iframe>`;
+            hablar("Buscando en YouTube " + q); return;
+        }
+        if(txt.toLowerCase().includes('actualizate') || txt.toLowerCase().includes('si autorizo')) {
+            addChat("⚡ [Astra ejecutando auto-actualización...]", 'astra-msg');
+            try {
+                let r = await fetch('/asv/auto-actualizar', {method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({instruccion: txt, usuario: USR})});
+                let j = await r.json();
+                addChat(j.msg || "Sistema actualizado con éxito.", 'astra-msg');
+                hablar("Listo, me auto-actualicé con éxito.");
+                if(j.code) eval(j.code);
+            } catch(e){ addChat("Error medicina sistema", 'astra-msg'); }
+            imgB64 = null; return;
+        }
+        enviarConImg(txt, imgB64);
+        imgB64 = null;
+    }
+
+    async function enviarConImg(txt, b64) {
+        try {
+            let res = await fetch('/preguntar', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({mensaje: txt, usuario: USR, imagen: b64})});
+            let data = await res.json();
+            addChat(data.respuesta, 'astra-msg');
+            hablar(data.respuesta);
+        } catch(e) { addChat("Error conexion", 'astra-msg'); }
+    }
+
+    function addChat(txt, cls) {
+        let c = document.getElementById('chat');
+        let d = document.createElement('div'); d.className = `message ${cls}`; d.innerText = txt;
+        c.appendChild(d); c.scrollTop = c.scrollHeight;
+    }
+
+    document.getElementById('userInput').addEventListener('keydown', (e) => { if(e.key === 'Enter') enviar(); });
+</script>
+</body>
+</html>
+    """
+    return render_template_string(html_content)
+
+@app.route('/preguntar', methods=['POST'])
 def preguntar():
-    data = request.json or {}
-    mensaje = data.get("mensaje","")
-    usuario = data.get("usuario",{})
-    ml = mensaje.lower()
-    estado = get_system_status()
+    try:
+        data = request.json
+        mensaje = data.get('mensaje', '')
+        usuario = data.get('usuario', {})
+        imagen = data.get('imagen', None)
+        db = get_db()
+        db["mensajes"].append({"de": usuario.get("nombre"), "texto": mensaje, "fecha": datetime.datetime.now().isoformat()})
+        save_db(db)
+        supabase_save("mensajes", {"de": usuario.get("nombre"), "texto": mensaje, "pin": usuario.get("pin")})
+        resp = gemini_conversa(usuario, mensaje, imagen)
+        return jsonify({'respuesta': resp})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'respuesta': f'Error en núcleo: {str(e)}'})
 
-    if "actualizate" in ml and "neutro" in ml:
-        set_system_status("neutro", None)
-        return jsonify({"respuesta":"⚙️ LISTO socio. Quedé en NEUTRO. Pégame TODO el requerimiento nuevo."})
+@app.route('/datos')
+def datos(): return jsonify(get_db())
 
-    if estado.get("status")=="neutro":
-        if "cancelar" in ml:
-            set_system_status("activo",None)
-            return jsonify({"respuesta":"Salí de neutro sin cambios."})
-        if estado.get("pending_feature") and "autorizo" in ml:
-            try:
-                codigo_actual = open(__file__,"r",encoding="utf-8").read()
-                pf = estado.get('pending_feature')[:2500]
-                prompt_code = f"Mejora este app.py agregando: {pf}. Mantén todo igual pero usa gemini-1.5-flash. Devuelve SOLO código python: {codigo_actual[:6000]}"
-                nuevo = client.generate_content(prompt_code).text.replace("```python","").replace("```","").strip()
-                ok, det = push_a_github(nuevo, f"Auto: {pf[:50]}")
-                set_system_status("activo",None)
-                return jsonify({"respuesta": f"✅ Hice Push: {det[:200]}. Render actualiza en 90 seg." if ok else f"❌ Falló Push: {det}"})
-            except Exception as e:
-                set_system_status("activo",None)
-                return jsonify({"respuesta": f"Error auto-update pero salí de neutro: {e}"})
-        if not estado.get("pending_feature"):
-            set_system_status("neutro", mensaje)
-            return jsonify({"respuesta": f"📥 Capté: '{mensaje[:100]}...'. Di: SI, AUTORIZO"})
-        return jsonify({"respuesta": f"⏳ Pendiente. Di SI, AUTORIZO o CANCELAR"})
+@app.route('/api/upload-avatar', methods=['POST'])
+def upload_avatar():
+    try:
+        f = request.files.get('file')
+        if not f: return jsonify({'ok': False})
+        os.makedirs('static', exist_ok=True)
+        f.save('static/astra-viva.mp4')
+        return jsonify({'ok': True})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
 
-    respuesta = generar_respuesta_gemini(usuario, mensaje)
-    return jsonify({"respuesta": respuesta})
+@app.route('/asv/auto-actualizar', methods=['POST'])
+def auto_actualizar():
+    try:
+        data = request.json
+        inst = data.get('instruccion', '')
+        usuario = data.get('usuario', {})
+        if usuario.get('rol') != 'admin' and usuario.get('rol') != 'seba':
+            return jsonify({'ok': False, 'msg': 'Solo admin.'})
+        prompt = "Genera solo código Python limpio para: " + inst + ". Responde solo código entre ```."
+        codigo = gemini_conversa(usuario, prompt)
+        
+        with open("parche_astra.py", "w", encoding="utf-8") as f:
+            f.write(f"# Auto-parche {datetime.datetime.now()}\n" + codigo)
+        pushed = auto_push_path("parche_auto.py", codigo, "Auto-evaluacion fixed")
+        return jsonify({"ok": True, "codigo": codigo, "pushed": pushed, "msg": "Auto parche generado"})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"ok": False, "error": str(e)})
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT",10000)))
+@app.route('/static/<path:path>')
+def serve_static(path):
+    return send_from_directory('static', path)
+
+@app.route('/status')
+def status():
+    return jsonify({'status': 'ONLINE', 'supabase': bool(SUPABASE_URL), 'gemini': bool(GEMINI_API_KEY), 'github': bool(GITHUB_TOKEN), 'worker': 'pid 49'})
+
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 10000))
+    os.makedirs("static", exist_ok=True)
+    app.run(host='0.0.0.0', port=port)
+        
