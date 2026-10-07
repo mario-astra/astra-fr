@@ -70,7 +70,18 @@ def gemini_conversa(usuario, mensaje, img_b64=None):
         "Conectada a Supabase 500 años y Bóveda. Responde carina voz 2 frases. Si piden código, genera código."
     )
     prompt = f"{instr}\n\n{mensaje}"
-    for m in ['gemini-2.5-flash', 'gemini-2.0-flash']:
+    
+    # Lista de fallback robusta para AI Studio (API_KEY formato AQ...)
+    modelos_fallback = [
+        'gemini-1.5-flash',
+        'gemini-1.5-flash-latest',
+        'gemini-1.5-flash-8b',
+        'gemini-2.0-flash-lite',
+        'gemini-2.5-flash',
+        'gemini-1.0-pro'
+    ]
+
+    for m in modelos_fallback:
         try:
             if img_b64:
                 resp = client.models.generate_content(
@@ -79,11 +90,14 @@ def gemini_conversa(usuario, mensaje, img_b64=None):
                 )
             else:
                 resp = client.models.generate_content(model=m, contents=prompt)
-            if resp and resp.text: return resp.text
+            if resp and resp.text:
+                print(f"Model OK: {m}")
+                return resp.text
         except Exception as e:
             print(f"Error {m}: {str(e)}")
             continue
-    return "No pude conectar a Gemini, verifica GEMINI_API_KEY en Render."
+            
+    return "No pude conectar a Gemini con ningún modelo disponible, verifica GEMINI_API_KEY en Render."
 
 @app.route('/')
 def index():
@@ -370,6 +384,4 @@ def status():
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
-    os.makedirs("static", exist_ok=True)
-    app.run(host='0.0.0.0', port=port)
-        
+    app.run(host='0.0.0.0', port=port, debug=False)
