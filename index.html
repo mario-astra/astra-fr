@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ASTRA FR - Mario</title>
+<style>
+:root{--bg:#020617;--gold:#ffd700;--card:#0f172a;--line:#1e293b}
+body{margin:0;background:var(--bg);color:#fff;font-family:system-ui;display:flex;flex-direction:column;height:100vh}
+#top{padding:12px;text-align:center;border-bottom:1px solid var(--line)}
+#avatar{width:88px;height:88px;margin:0 auto;border-radius:50%;border:3px solid var(--gold);background:radial-gradient(circle,#1e293b,#020617);display:flex;align-items:center;justify-content:center;font-size:40px;overflow:hidden}
+#avatar.talk{animation:pop.25s infinite alternate} @keyframes pop{to{transform:scale(1.08)}}
+#chat{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+.m{padding:10px 14px;border-radius:18px;max-width:82%;line-height:1.4;word-break:break-word}
+.u{background:var(--gold);color:#000;align-self:flex-end}
+.b{background:var(--card);border:1px solid var(--line);align-self:flex-start}
+#bar{display:flex;gap:8px;padding:10px;background:var(--card);align-items:center}
+#plus,#mic{width:44px;height:44px;border-radius:50%;border:none;background:var(--gold);font-weight:900;cursor:pointer}
+#mic.rec{background:red;color:#fff;animation:pulse 1s infinite} @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,0,0,.7)}100%{box-shadow:0 0 0 12px rgba(255,0,0,0)}}
+#txt{flex:1;padding:12px 16px;border-radius:25px;border:1px solid #334155;background:#020617;color:#fff;outline:none}
+#bub{position:fixed;bottom:18px;right:18px;width:58px;height:58px;background:var(--gold);color:#000;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;cursor:grab;z-index:9999;box-shadow:0 0 15px var(--gold)}
+#menu{position:fixed;bottom:76px;left:12px;background:var(--card);border:1px solid var(--gold);border-radius:12px;display:none;flex-direction:column;z-index:999}
+#menu button{padding:12px 16px;background:transparent;color:#fff;border:none;text-align:left;border-bottom:1px solid var(--line)}
+</style>
+</head>
+<body>
+<div id="top"><div id="avatar">✨</div><div style="color:var(--gold);font-weight:800;margin-top:6px">ASTRA FR</div><small id="mode">PIN 2208 | Lista</small></div>
+<div id="chat"><div class="m b">Hola Mario, ya estoy con todo el poder. Probá el + para foto, el micro con 2 toques para modo charla, decí Waze, Spotify o activa modo sentinela.</div></div>
+<div id="menu"><button onclick="pickFile()">📁 Archivo / Foto</button><button onclick="takePhoto()">📸 Tomar Foto</button></div>
+<div id="bar"><button id="plus">+</button><input id="txt" placeholder="Escribe o di Astra..."><button id="mic">🎤</button></div>
+<div id="bub">A</div>
+<input type="file" id="f" accept="image/*" style="display:none">
+<script>
+let modoCharla=false, rec=null, last=0, sent=false;
+const chat=document.getElementById('chat'), txt=document.getElementById('txt'), plus=document.getElementById('plus'), mic=document.getElementById('mic'), menu=document.getElementById('menu'), bub=document.getElementById('bub'), av=document.getElementById('avatar'), mode=document.getElementById('mode');
+plus.onclick=()=>menu.style.display=menu.style.display==='flex'?'none':'flex';
+function pickFile(){document.getElementById('f').click();menu.style.display='none'}
+function takePhoto(){navigator.mediaDevices.getUserMedia({video:true}).then(s=>{let v=document.createElement('video');v.srcObject=s;v.autoplay=true;v.style.position='fixed';v.style.width='120px';v.style.top='0';v.style.zIndex='10000';document.body.appendChild(v);setTimeout(()=>{let c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;c.getContext('2d').drawImage(v,0,0);send('Analiza foto',c.toDataURL('image/jpeg').split(',')[1]);s.getTracks().forEach(t=>t.stop());v.remove()},1800)})}
+document.getElementById('f').onchange=e=>{let r=new FileReader();r.onload=()=>send('Analiza imagen',r.result.split(',')[1]);r.readAsDataURL(e.target.files[0])}
+function add(t,c){let d=document.createElement('div');d.className='m '+c;d.innerHTML=t;chat.appendChild(d);chat.scrollTop=chat.scrollHeight}
+async function send(t,img=null){if(!t&&!img)return;add(t||'📷 Foto','u');txt.value='';let low=(t||'').toLowerCase();if(low.includes('waze')||low.includes('mapa')||low.includes('maps')){let q=encodeURIComponent(t);let src=low.includes('waze')?'https://embed.waze.com/iframe?zoom=12&lat=6.2442&lon=-75.5812&pin=1':'https://maps.google.com/maps?q='+q+'&z=15&output=embed';add(`<iframe width="100%" height="260" style="border:0;border-radius:12px" src="${src}"></iframe>`,'b')}if(low.includes('spotify'))add(`<iframe style="border-radius:12px" src="https://open.spotify.com/embed/search/${encodeURIComponent(t)}" width="100%" height="152" frameborder="0"></iframe>`,'b');if(low.includes('youtube')||low.includes('video'))add(`<iframe width="100%" height="220" src="https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(t)}" frameborder="0"></iframe>`,'b');if(low.includes('sentinela'))activarSentinela();let r=await fetch('/preguntar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mensaje:t,usuario:{nombre:'Mario',pin:'2208'},imagen:img})});let j=await r.json();add(j.respuesta,'b');if(modoCharla)hablar(j.respuesta)}
+txt.onkeydown=e=>{if(e.key==='Enter')send(txt.value)}
+mic.onclick=()=>{let now=Date.now();if(now-last<350){modoCharla=!modoCharla;mode.innerText=modoCharla?'MODO CHARLA - Solo escucho':'PIN 2208 | Lista';av.classList.toggle('talk',modoCharla);if(modoCharla)startCont();else stopCont()}else startOnce();last=now}
+function startOnce(){let SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return alert('Micro no soportado');let r=new SR();r.lang='es-CO';r.onstart=()=>mic.classList.add('rec');r.onend=()=>mic.classList.remove('rec');r.onresult=e=>{txt.value=e.results[0][0].transcript;send(txt.value)};r.start()}
+function startCont(){let SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return;rec=new SR();rec.lang='es-CO';rec.continuous=true;rec.onresult=e=>{let t=e.results[e.results.length-1][0].transcript;if(t.toLowerCase().includes('astra'))hablar('Dime Mario, te escucho');else send(t)};rec.start();mic.classList.add('rec')}
+function stopCont(){if(rec)rec.stop();mic.classList.remove('rec')}
+function hablar(t){let u=new SpeechSynthesisUtterance(t);u.lang='es-CO';av.classList.add('talk');u.onend=()=>av.classList.remove('talk');speechSynthesis.speak(u)}
+let drag=false,ox,oy;bub.onmousedown=e=>{drag=true;ox=e.clientX-bub.offsetLeft;oy=e.clientY-bub.offsetTop};document.onmousemove=e=>{if(drag){bub.style.left=(e.clientX-ox)+'px';bub.style.top=(e.clientY-oy)+'px';bub.style.bottom='auto';bub.style.right='auto'}};document.onmouseup=()=>drag=false;bub.ontouchstart=e=>{let t=e.touches[0];drag=true;ox=t.clientX-bub.offsetLeft;oy=t.clientY-bub.offsetTop};document.ontouchmove=e=>{if(drag){let t=e.touches[0];bub.style.left=(t.clientX-ox)+'px';bub.style.top=(t.clientY-oy)+'px'}};document.ontouchend=()=>drag=false;bub.onclick=()=>
