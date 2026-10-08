@@ -78,7 +78,7 @@ def gemini_conversa(usuario, mensaje, img_b44=None):
     try:
         if img_b44:
             resp = client.models.generate_content(
-                model='models/gemini-2.5-flash',
+                model='models/gemini-3.8-flash',
                 contents=[
                     types.Part.from_bytes(
                         data=__import__('base64').b64decode(img_b44),
@@ -89,12 +89,13 @@ def gemini_conversa(usuario, mensaje, img_b44=None):
             )
         else:
             resp = client.models.generate_content(
-                model='models/gemini-2.5-flash',
+                model='models/gemini-3.8-flash',
                 contents=prompt_completo
             )
         return resp.text
     except Exception as e:
         return f"Error conectando con Gemini: {str(e)}"
+        
         
                             
 @app.route('/')
