@@ -60,40 +60,42 @@ def get_db():
 def save_db(d):
     with open(DB_FILE, "w", encoding="utf-8") as f: json.dump(d, f, ensure_ascii=False, indent=2)
 
-def gemini_conversa(usuario, mensaje, img_b64=None):
+def gemini_conversa(usuario, mensaje, img_b44=None):
+    from google import genai
+    from google.genai import types
+    import os
+    
     if not client:
         return "Falta configurar la GEMINI_API_KEY."
-    rol = usuario.get('rol', 'invitado')
+    
     instr = (
         "Eres ASTRA FR v2 FINAL AUTO-ACTUALIZABLE. "
-        "Admin Mario (2208). Seba (0709), parcero técnico. Si te dicen 'Astra' responde primero 'Hola Mario, dime' y espera pedido. "
-        "Conectada a Supabase 500 años y Bóveda. Responde carina voz 2 frases. Si piden código, genera código."
+        "Admin Mario (2208). Seba (0709), parcero técnico. Si te dicen 'Astra' respondes. "
+        "Conectada a Supabase 500 años y Bóveda. Responde carina voz 2 frases. Si piden más amplias."
     )
-    prompt = f"{instr}\n\n{mensaje}"
+    prompt_completo = f"{instr}\n\n{mensaje}"
     
-    # Modelos oficiales vigentes para la librería google-genai
-        modelos_a_probar = [
-        'models/gemini-2.5-flash',
-       ]
-    
-        for m in modelos_a_probar:
-        try:
-    
-            if img_b64:
-                resp = client.models.generate_content(
-                    model=m,
-                    contents=[types.Part.from_bytes(data=base64.b64decode(img_b64), mime_type="image/jpeg"), prompt]
-                )
-            else:
-                resp = client.models.generate_content(model=m, contents=prompt)
-            if resp and resp.text:
-                print(f"Model OK: {m}")
-                return resp.text
-        except Exception as e:
-            print(f"Error {m}: {str(e)}")
-            continue
-            
-    return "No pude conectar a Gemini con ningún modelo disponible, verifica GEMINI_API_KEY en Render."
+    try:
+        if img_b44:
+            resp = client.models.generate_content(
+                model='models/gemini-2.5-flash',
+                contents=[
+                    types.Part.from_bytes(
+                        data=__import__('base64').b64decode(img_b44),
+                        mime_type='image/jpeg',
+                    ),
+                    prompt_completo
+                ]
+            )
+        else:
+            resp = client.models.generate_content(
+                model='models/gemini-2.5-flash',
+                contents=prompt_completo
+            )
+        return resp.text
+    except Exception as e:
+        return f"Error conectando con Gemini: {str(e)}"
+        
                             
 @app.route('/')
 def index():
