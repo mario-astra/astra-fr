@@ -79,8 +79,9 @@ def gemini_conversa(usuario, mensaje, img_b64=None):
      
         ]
     
-    for m in MODELOS_FALLBACK:
+        for m in modelos_a_probar:
         try:
+    
             if img_b64:
                 resp = client.models.generate_content(
                     model=m,
