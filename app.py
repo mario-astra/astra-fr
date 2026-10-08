@@ -72,11 +72,12 @@ def gemini_conversa(usuario, mensaje, img_b64=None):
     prompt = f"{instr}\n\n{mensaje}"
     
     # Modelos oficiales vigentes para la librería google-genai
-    MODELOS_FALLBACK = [
-        'gemini-2.5-flash',
-        'gemini-2.0-flash',
-        'gemini-1.5-flash',
-    ]
+        modelos_a_probar = [
+        'models/gemini-2.5-flash',
+        'models/gemini-2.0-flash',
+        'models/gemini-1.5-flash'
+     
+        ]
     
     for m in MODELOS_FALLBACK:
         try:
