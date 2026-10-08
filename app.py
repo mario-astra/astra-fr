@@ -71,18 +71,15 @@ def gemini_conversa(usuario, mensaje, img_b64=None):
     )
     prompt = f"{instr}\n\n{mensaje}"
     
-    # Lista de fallback 2026 - Modelos vigentes
+    # Modelos oficiales vigentes para la librería google-genai
     MODELOS_FALLBACK = [
+        'gemini-2.5-flash',
         'gemini-2.0-flash',
-        'gemini-flash-latest',
-        'gemini-2.5-flash-lite',
-        'gemini-3-flash-preview',
-        'gemini-3.5-flash',
-        'gemini-3.5-flash-lite',
-        'gemini-3.8-flash',
-        'gemini-pro-latest'
-    ] 
-   for m in MODELOS_FALLBACK:
+        'gemini-1.5-flash',
+        'gemini-1.5-pro'
+    ]
+    
+    for m in MODELOS_FALLBACK:
         try:
             if img_b64:
                 resp = client.models.generate_content(
@@ -99,7 +96,7 @@ def gemini_conversa(usuario, mensaje, img_b64=None):
             continue
             
     return "No pude conectar a Gemini con ningún modelo disponible, verifica GEMINI_API_KEY en Render."
-
+                            
 @app.route('/')
 def index():
     html_content = """
