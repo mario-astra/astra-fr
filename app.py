@@ -72,7 +72,7 @@ def gemini_conversa(usuario, mensaje, img_b64=None):
     prompt = f"{instr}\n\n{mensaje}"
     
     # Lista de fallback robusta para AI Studio
-        MODELOS_FALLBACK = [
+    MODELOS_FALLBACK = [
         'gemini-2.5-flash',
         'gemini-flash-latest',
         'gemini-2.0-flash',
