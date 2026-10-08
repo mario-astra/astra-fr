@@ -76,7 +76,6 @@ def gemini_conversa(usuario, mensaje, img_b64=None):
         'gemini-2.5-flash',
         'gemini-2.0-flash',
         'gemini-1.5-flash',
-        'gemini-1.5-pro'
     ]
     
     for m in MODELOS_FALLBACK:
