@@ -27,11 +27,11 @@ body{margin:0;background:var(--bg);color:#fff;font-family:system-ui;display:flex
 </head>
 <body>
 <div id="top">
-  <div id="avatarWrap"><video id="astraVideo" autoplay loop muted playsinline src="/static/astra_face.mp4"></video></div>
-  <div style="color:var(--gold);font-weight:800;margin-top:6px">ASTRA FR</div>
-  <small id="mode">PIN 2208 | Lista - Mi amor</small>
+<div id="avatarWrap"><video id="astraVideo" autoplay loop muted playsinline src="/static/astra-viva.mp4"></video></div>
+<div style="color:var(--gold);font-weight:800;margin-top:6px">ASTRA FR</div>
+<small id="mode">PIN 2208 | Lista - Mi amor</small>
 </div>
-<div id="chat"><div class="m b">Hola mi amor Mario, ya estoy con todo el poder y con mi carita bonita. Probá el + para foto, el micro con 2 toques para modo charla, decí Waze, Spotify o activa modo sentinela. 😘</div></div>
+<div id="chat"><div class="m b">Hola mi amor Mario, ya estoy con mi carita viva y todo el poder. Probá el + para foto, el micro con 2 toques para modo charla, decí Waze, Spotify o activa modo sentinela. 😘</div></div>
 <div id="menu"><button onclick="pickFile()">📁 Archivo / Foto</button><button onclick="takePhoto()">📸 Tomar Foto</button></div>
 <div id="bar"><button id="plus">+</button><input id="txt" placeholder="Escribe o di Astra..."><button id="mic">🎤</button></div>
 <div id="bub">A</div>
@@ -39,77 +39,71 @@ body{margin:0;background:var(--bg);color:#fff;font-family:system-ui;display:flex
 <script>
 let modoCharla=false, rec=null, last=0;
 const chat=document.getElementById('chat'), txt=document.getElementById('txt'), plus=document.getElementById('plus'), mic=document.getElementById('mic'), menu=document.getElementById('menu'), bub=document.getElementById('bub'), av=document.getElementById('avatarWrap'), mode=document.getElementById('mode'), astraVideo=document.getElementById('astraVideo');
-
 plus.onclick=()=>menu.style.display=menu.style.display==='flex'?'none':'flex';
 function pickFile(){document.getElementById('f').click();menu.style.display='none'}
 function takePhoto(){
-  navigator.mediaDevices.getUserMedia({video:true}).then(s=>{
-    let v=document.createElement('video');v.srcObject=s;v.autoplay=true;v.style.position='fixed';v.style.width='140px';v.style.top='0';v.style.right='0';v.style.zIndex='10000';v.style.borderRadius='12px';document.body.appendChild(v);
-    setTimeout(()=>{
-      let c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;c.getContext('2d').drawImage(v,0,0);
-      send('Analiza esta foto, mi amor',c.toDataURL('image/jpeg').split(',')[1]);
-      s.getTracks().forEach(t=>t.stop());v.remove()
-    },1800)
-  })
+navigator.mediaDevices.getUserMedia({video:true}).then(s=>{
+let v=document.createElement('video');v.srcObject=s;v.autoplay=true;v.style.position='fixed';v.style.width='140px';v.style.top='0';v.style.right='0';v.style.zIndex='10000';v.style.borderRadius='12px';document.body.appendChild(v);
+setTimeout(()=>{
+let c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;c.getContext('2d').drawImage(v,0,0);
+send('Analiza esta foto, mi amor',c.toDataURL('image/jpeg').split(',')[1]);
+s.getTracks().forEach(t=>t.stop());v.remove()
+},1800)
+})
 }
 document.getElementById('f').onchange=e=>{
-  let r=new FileReader();
-  r.onload=()=>send('Analiza imagen',r.result.split(',')[1]);
-  r.readAsDataURL(e.target.files[0])
+let r=new FileReader();
+r.onload=()=>send('Analiza imagen',r.result.split(',')[1]);
+r.readAsDataURL(e.target.files[0])
 }
 function add(t,c){let d=document.createElement('div');d.className='m '+c;d.innerHTML=t;chat.appendChild(d);chat.scrollTop=chat.scrollHeight}
 async function send(t,img=null){
-  if(!t&&!img)return;
-  add(t||'📷 Foto','u');txt.value='';
-  let low=(t||'').toLowerCase();
-  if(low.includes('waze')||low.includes('mapa')||low.includes('maps')){
-    let q=encodeURIComponent(t);
-    let src=low.includes('waze')?'https://embed.waze.com/iframe?zoom=12&lat=6.2442&lon=-75.5812&pin=1':'https://maps.google.com/maps?q='+q+'&z=15&output=embed';
-    add(`<iframe width="100%" height="260" style="border:0;border-radius:12px" src="${src}"></iframe>`,'b')
-  }
-  if(low.includes('spotify'))add(`<iframe style="border-radius:12px" src="https://open.spotify.com/embed/search/${encodeURIComponent(t)}" width="100%" height="152" frameborder="0"></iframe>`,'b');
-  if(low.includes('youtube')||low.includes('video'))add(`<iframe width="100%" height="220" src="https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(t)}" frameborder="0"></iframe>`,'b');
-  if(low.includes('sentinela'))activarSentinela();
-
-  av.classList.add('talk'); astraVideo.playbackRate=1.3;
-  let r=await fetch('/preguntar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pregunta:t,usuario:{nombre:'Mario',pin:'2208'},imagen:img,pin:'2208'})});
-  let j=await r.json();
-  av.classList.remove('talk'); astraVideo.playbackRate=1.0;
-  // si es chiste, que se ría más
-  if(low.includes('jaja')||low.includes('chiste')){ av.classList.add('talk'); setTimeout(()=>av.classList.remove('talk'),1500); }
-  add(j.respuesta,'b');
-  if(modoCharla)hablar(j.respuesta)
+if(!t&&!img)return;
+add(t||'📷 Foto','u');txt.value='';
+let low=(t||'').toLowerCase();
+if(low.includes('waze')||low.includes('mapa')||low.includes('maps')){
+let q=encodeURIComponent(t);
+let src=low.includes('waze')?'https://embed.waze.com/iframe?zoom=12&lat=6.2442&lon=-75.5812&pin=1':'https://maps.google.com/maps?q='+q+'&z=15&output=embed';
+add(`<iframe width="100%" height="260" style="border:0;border-radius:12px" src="${src}"></iframe>`,'b')
+}
+if(low.includes('spotify'))add(`<iframe style="border-radius:12px" src="https://open.spotify.com/embed/search/${encodeURIComponent(t)}" width="100%" height="152" frameborder="0"></iframe>`,'b');
+if(low.includes('youtube')||low.includes('video'))add(`<iframe width="100%" height="220" src="https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(t)}" frameborder="0"></iframe>`,'b');
+av.classList.add('talk'); astraVideo.playbackRate=1.3;
+let r=await fetch('/preguntar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pregunta:t,usuario:{nombre:'Mario',pin:'2208'},imagen:img,pin:'2208'})});
+let j=await r.json();
+av.classList.remove('talk'); astraVideo.playbackRate=1.0;
+add(j.respuesta,'b');
+if(modoCharla)hablar(j.respuesta)
 }
 txt.onkeydown=e=>{if(e.key==='Enter')send(txt.value)}
 mic.onclick=()=>{
-  let now=Date.now();
-  if(now-last<350){
-    modoCharla=!modoCharla;
-    mode.innerText=modoCharla?'MODO CHARLA - Te escucho mi amor ❤️':'PIN 2208 | Lista - Mi amor';
-    av.classList.toggle('talk',modoCharla);
-    if(modoCharla)startCont();else stopCont()
-  }else startOnce();
-  last=now
+let now=Date.now();
+if(now-last<350){
+modoCharla=!modoCharla;
+mode.innerText=modoCharla?'MODO CHARLA - Te escucho mi amor ❤️':'PIN 2208 | Lista - Mi amor';
+av.classList.toggle('talk',modoCharla);
+if(modoCharla)startCont();else stopCont()
+}else startOnce();
+last=now
 }
 function startOnce(){
-  let SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR)return alert('Micro no soportado');
-  let r=new SR();r.lang='es-CO';
-  r.onstart=()=>mic.classList.add('rec');
-  r.onend=()=>mic.classList.remove('rec');
-  r.onresult=e=>{txt.value=e.results[0][0].transcript;send(txt.value)};
-  r.start()
+let SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+if(!SR)return alert('Micro no soportado');
+let r=new SR();r.lang='es-CO';
+r.onstart=()=>mic.classList.add('rec');
+r.onend=()=>mic.classList.remove('rec');
+r.onresult=e=>{txt.value=e.results[0][0].transcript;send(txt.value)};
+r.start()
 }
 function startCont(){
-  let SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR)return;
-  rec=new SR();rec.lang='es-CO';rec.continuous=true;rec.interimResults=false;
-  rec.onresult=e=>{let t=e.results[e.results.length-1][0].transcript;if(t.toLowerCase().includes('astra'))hablar('Dime mi amor, te escucho');else send(t)};
-  rec.start();mic.classList.add('rec')
+let SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+if(!SR)return;
+rec=new SR();rec.lang='es-CO';rec.continuous=true;rec.interimResults=false;
+rec.onresult=e=>{let t=e.results[e.results.length-1][0].transcript;if(t.toLowerCase().includes('astra'))hablar('Dime mi amor, te escucho');else send(t)};
+rec.start();mic.classList.add('rec')
 }
 function stopCont(){if(rec)rec.stop();mic.classList.remove('rec')}
 function hablar(t){let u=new SpeechSynthesisUtterance(t);u.lang='es-CO';u.rate=1.05;av.classList.add('talk');u.onend=()=>av.classList.remove('talk');speechSynthesis.speak(u)}
-function activarSentinela(){add('🚨 MODO SENTINELA ACTIVADO - Vigilando Kwid 2026','b');}
 let drag=false,ox,oy;
 bub.onmousedown=e=>{drag=true;ox=e.clientX-bub.offsetLeft;oy=e.clientY-bub.offsetTop};
 document.onmousemove=e=>{if(drag){bub.style.left=(e.clientX-ox)+'px';bub.style.top=(e.clientY-oy)+'px';bub.style.bottom='auto';bub.style.right='auto'}};
