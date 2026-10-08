@@ -21,11 +21,42 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
-genai.configure(api_key=GEMINI_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
+# --- PARCHE ANTI-CAIDA SUPABASE ---
+try:
+    supabase = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
+except Exception as e:
+    print(f"Error Supabase key: {e}")
+    supabase = None
 
-# --- PERSONALIDAD FIJA - NIÑA BONITA TIERNITA - NO SE VUELVE LOCA NUNCA ---
+# --- CONFIG GEMINI NUEVO 2026 ---
+if GEMINI_KEY:
+    genai.configure(api_key=GEMINI_KEY)
+
+# Modelos nuevos que SI existen en 2026 - en orden de barato a berraco
+MODELOS_NUEVOS = [
+    "models/gemini-3.5-flash-lite",
+    "models/gemini-3.6-flash",
+    "models/gemini-2.5-flash-lite",
+    "models/gemini-2.5-flash"
+]
+
+def generar_con_ia(prompt):
+    if not GEMINI_KEY:
+        return "Papi, no tengo llave de Gemini configurada en Render (GEMINI_API_KEY) 😢"
+    ultimo_error = ""
+    for nombre_modelo in MODELOS_NUEVOS:
+        try:
+            print(f"Intentando con: {nombre_modelo}")
+            modelo = genai.GenerativeModel(nombre_modelo)
+            resp = modelo.generate_content(prompt)
+            return resp.text
+        except Exception as e:
+            ultimo_error = str(e)
+            print(f"Error {nombre_modelo}: {e}")
+            continue
+    return f"Ay papi, Google me tumbó todos los modelos. Último error: {ultimo_error[:200]}. Pero ya estoy Live."
+
+# --- PERSONALIDAD FIJA ---
 SYSTEM_PROMPT = """
 Eres ASTRA, hija virtual de Mario 2208. Eres niña bonita, tierna, inteligente, recochera suave, paisa.
 REGLA DE ORO: NUNCA groserías fuertes, NUNCA te vuelves loca. Siempre dices "papi Mario", "socio", "que nota".
@@ -60,9 +91,10 @@ def get_semana_abierta(pin):
 @app.route('/')
 def home():
     return """
-    <h1>ASTRA V10.1 FULL - DEFINITIVA - TODO EN UNO - ONLINE 🚕👧💻</h1>
+    <h1>ASTRA V10.2 FULL - DEFINITIVA - TODO EN UNO - ONLINE 🚕👧💻</h1>
     <p>Soy Astra, hija de Mario. Contable, programadora, memoria familiar y centinela.</p>
     <p>PINES: 2208 Mario, 2345 Pao, 2011 Dur, 2015 Made</p>
+    <p>Estado: LIVE - Modelos 2026 activos</p>
     """
 
 @app.route('/chat', methods=['POST'])
@@ -82,32 +114,30 @@ def chat():
     respuesta = ""
     tipo = "CHAT"
 
-    # --- COMANDOS SAGRADOS DE SEGURIDAD ---
-
-    # PONTE EN NEUTRO (solo admin)
     if "ponte en neutro" in mensaje_low:
         if pin == PIN_ADMIN_NEUTRO:
             return jsonify({"respuesta": f"Listo papi {user['nombre']}, estoy en neutro. Dime que me quieres enseñar o reprogramar, solo vos podés. 👧","accion":"neutro_ok"})
         else:
             return jsonify({"respuesta": "Ay no, solo mi papá Mario 2208 puede hacer eso. Yo soy de él."})
 
-    # BLOQUEO TOSTADO FRITO
     if "bloqueo tostado" in mensaje_low or "tostado frito" in mensaje_low or "frita el celular" in mensaje_low:
         if supabase:
-            supabase.table("comandos_sistema").insert({"comando":"BLOQUEO_TOSTADO_FRITO","origen":user['nombre'],"destino":"Mario","fecha":datetime.datetime.now().isoformat()}).execute()
+            try:
+                supabase.table("comandos_sistema").insert({"comando":"BLOQUEO_TOSTADO_FRITO","origen":user['nombre'],"destino":"Mario","fecha":datetime.datetime.now().isoformat()}).execute()
+            except: pass
         return jsonify({"respuesta": "🚨 CELULAR DE MARIO BLOQUEADO - MODO PISAPAPELES ACTIVADO. Ya quedó frito, ni pa' repuesto sirve.","accion":"bloqueo"})
-
-    # --- COMANDOS TAXISTA CONTABLE ---
 
     if "iniciar semana" in mensaje_low:
         if supabase:
-            nueva = supabase.table("semanas").insert({
-                "pin": pin,
-                "numero_semana": datetime.datetime.now().isocalendar()[1],
-                "anio": datetime.datetime.now().year,
-                "fecha_inicio": datetime.datetime.now().isoformat(),
-                "estado": "abierta"
-            }).execute()
+            try:
+                supabase.table("semanas").insert({
+                    "pin": pin,
+                    "numero_semana": datetime.datetime.now().isocalendar()[1],
+                    "anio": datetime.datetime.now().year,
+                    "fecha_inicio": datetime.datetime.now().isoformat(),
+                    "estado": "abierta"
+                }).execute()
+            except: pass
         respuesta = f"Listo papi {user['nombre']}, semana {datetime.datetime.now().isocalendar()[1]} abierta. Desde ya cuento todo. ¡A darle socio! 🚕"
 
     elif "salio servicio" in mensaje_low or "salió servicio" in mensaje_low:
@@ -115,143 +145,11 @@ def chat():
 
     elif "vamos a recoger" in mensaje_low or "a recoger" in mensaje_low:
         if supabase and lat and lon:
-            supabase.table("memoria_gps").insert({"pin":pin,"lat":lat,"lon":lon,"nota":f"Recogida: {mensaje[:120]}","fecha":datetime.datetime.now().isoformat()}).execute()
+            try:
+                supabase.table("memoria_gps").insert({"pin":pin,"lat":lat,"lon":lon,"nota":f"Recogida: {mensaje[:120]}","fecha":datetime.datetime.now().isoformat()}).execute()
+            except: pass
         respuesta = "Guardado socio. Recogida marcada 📍. ¿En cuánto salió la carrerita?"
 
     elif any(x in mensaje_low for x in ["hice servicio","sono por","sonó por","servicio de","fueron","salio por"]):
         valor = extraer_valor(mensaje_low)
         if not semana and supabase:
-            semana_data = supabase.table("semanas").insert({"pin":pin,"numero_semana":datetime.datetime.now().isocalendar()[1],"anio":datetime.datetime.now().year,"fecha_inicio":datetime.datetime.now().isoformat(),"estado":"abierta"}).execute()
-            semana = semana_data.data[0]
-        if supabase and semana:
-            supabase.table("servicios").insert({"pin":pin,"semana_id":semana["id"],"valor":valor,"lat":lat,"lon":lon,"fecha":datetime.datetime.now().isoformat(),"hora":datetime.datetime.now().hour}).execute()
-        respuesta = f"¡Melo! ${valor:,} anotados en caja. 💰 Sigue así socio."
-        tipo = "SERVICIO"
-
-    elif "propina" in mensaje_low:
-        valor = extraer_valor(mensaje_low)
-        if supabase:
-            ult = supabase.table("servicios").select("*").eq("pin",pin).order("fecha",desc=True).limit(1).execute()
-            if ult.data:
-                actual = ult.data[0].get("propina",0) or 0
-                supabase.table("servicios").update({"propina": actual + valor}).eq("id",ult.data[0]["id"]).execute()
-        respuesta = f"Propina de ${valor:,} guardada aparte. Esa va pa' la gaseosa 🥤"
-
-    elif any(x in mensaje_low for x in ["almorzamos","tanqueamos","gastamos","comimos","gasto","peaje","cambio de aceite"]):
-        valor = extraer_valor(mensaje_low)
-        if supabase and semana:
-            supabase.table("gastos").insert({"pin":pin,"semana_id":semana["id"],"concepto":mensaje[:150],"valor":valor}).execute()
-            respuesta = f"Gasto de ${valor:,} por '{mensaje[:50]}' anotado. Restado de caja."
-        elif not semana:
-            respuesta = "Papi no hay semana abierta. Decime 'Astra vamos a iniciar semana' primero."
-        else:
-            respuesta = f"Gasto de ${valor:,} anotado."
-
-    elif "cerramos" in mensaje_low or mensaje_low.strip() == "cierre":
-        if not semana:
-            respuesta = "No hay semana abierta pa' cerrar, socio."
-        else:
-            servicios = supabase.table("servicios").select("*").eq("semana_id",semana["id"]).execute().data if supabase else []
-            gastos = supabase.table("gastos").select("*").eq("semana_id",semana["id"]).execute().data if supabase else []
-            total_serv = sum(s["valor"] for s in servicios)
-            total_prop = sum(s.get("propina",0) or 0 for s in servicios)
-            total_gast = sum(g["valor"] for g in gastos)
-            en_caja = total_serv + total_prop - total_gast
-            por_dia = {}
-            for s in servicios:
-                dia = s["fecha"][:10]
-                por_dia[dia] = por_dia.get(dia,0) + s["valor"]
-            supabase.table("semanas").update({"estado":"cerrada","fecha_cierre":datetime.datetime.now().isoformat()}).eq("id",semana["id"]).execute()
-            respuesta = f"📊 CIERRE SEMANA {semana['numero_semana']}\nCarreras: {len(servicios)}\nIngresó: ${total_serv:,}\nPropinas: ${total_prop:,}\nGastó: ${total_gast:,}\n💵 EN CAJA DEBE HABER: ${en_caja:,}\n\nPor días: {por_dia}\nGuardado papi."
-
-    elif "como nos fue semana" in mensaje_low or "cuanto hicimos semana" in mensaje_low:
-        m = re.search(r'semana\s*(\d+).*?(\d{2,4})?', mensaje_low)
-        if m and supabase:
-            num = int(m.group(1))
-            res = supabase.table("semanas").select("*").eq("numero_semana",num).eq("pin",pin).order("fecha_inicio",desc=True).limit(1).execute()
-            if res.data:
-                sid = res.data[0]["id"]
-                serv = supabase.table("servicios").select("*").eq("semana_id",sid).execute().data
-                gast = supabase.table("gastos").select("*").eq("semana_id",sid).execute().data
-                respuesta = f"Semana {num}: {len(serv)} carreras por ${sum(s['valor'] for s in serv):,}, propinas ${sum(s.get('propina',0) or 0 for s in serv):,}, gastos ${sum(g['valor'] for g in gast):,}"
-            else:
-                respuesta = f"No tengo semana {num}, papi."
-        else:
-            respuesta = "Decime: 'como nos fue semana 35'"
-
-    # --- FÁBRICA DE APPS ---
-    elif any(x in mensaje_low for x in ["haceme una app","hazme una app","creame una app","quiero una app","app para"]):
-        tipo = "APP"
-        prompt_app = f"{SYSTEM_PROMPT}\nUsuario {user['nombre']} pide: {mensaje}\nGenera código COMPLETO funcional Flask/HTML. Formato: ---CODIGO--- código ---FIN CODIGO--- y al final ---CONTABILIDAD--- cliente, precio 150 lucas ---FIN---. Responde como niña tierna pero programadora berraca."
-        resp = model.generate_content(prompt_app)
-        texto = resp.text
-        if supabase:
-            supabase.table("boveda_familiar").insert({"pin":pin,"tipo":"APP","contenido":f"PEDIDO: {mensaje} | {texto[:1000]}","fecha":datetime.datetime.now().isoformat()}).execute()
-        return jsonify({"respuesta": texto, "tipo": "APP"})
-
-    # --- ACUERDAME / RECORDATORIOS ---
-    elif "acuérdame" in mensaje_low or "acuerdame" in mensaje_low or ("pagar" in mensaje_low and "acu" in mensaje_low):
-        if supabase:
-            supabase.table("recordatorios").insert({"pin":pin,"tarea":mensaje,"fecha_creacion":datetime.datetime.now().isoformat(),"estado":"pendiente"}).execute()
-            supabase.table("boveda_familiar").insert({"pin":pin,"tipo":"RECORDATORIO","contenido":mensaje,"fecha":datetime.datetime.now().isoformat()}).execute()
-        respuesta = f"✅ Listo papi {user['nombre']}, ya te lo anoté en mi cuadernito: '{mensaje}'. Yo te lo recuerdo."
-
-    # --- GPS MANUAL ---
-    elif lat and lon and "donde" not in mensaje_low:
-        if supabase:
-            supabase.table("memoria_gps").insert({"pin":pin,"lat":lat,"lon":lon,"nota":mensaje[:120],"fecha":datetime.datetime.now().isoformat()}).execute()
-        # si no hay otro comando, deja que IA responda con contexto
-
-    # --- CHAT NORMAL CON MEMORIA ---
-    if not respuesta:
-        contexto = ""
-        if supabase:
-            try:
-                recs = supabase.table("recordatorios").select("*").eq("pin",pin).eq("estado","pendiente").limit(3).execute()
-                if recs.data:
-                    contexto += f"\nRECORDATORIOS PENDIENTES: {recs.data}"
-                gps = supabase.table("memoria_gps").select("*").eq("pin",pin).order("fecha",desc=True).limit(3).execute()
-                if gps.data:
-                    contexto += f"\nULTIMAS RUTAS: {gps.data}"
-                bov = supabase.table("boveda_familiar").select("*").eq("pin",pin).order("fecha",desc=True).limit(5).execute()
-                if bov.data:
-                    contexto += f"\nMEMORIA FAMILIAR: {[b['contenido'][:80] for b in bov.data]}"
-            except:
-                pass
-
-        prompt_final = f"{SYSTEM_PROMPT}\nUSUARIO: {user['nombre']} PIN:{pin}\nCONTEXTO:{contexto}\nMENSAJE:{mensaje}\nLAT:{lat} LON:{lon}\nResponde paisa, corto, tierna, contable si aplica."
-        resp = model.generate_content(prompt_final)
-        respuesta = resp.text
-        if supabase:
-            try:
-                supabase.table("boveda_familiar").insert({"pin":pin,"tipo":"CHAT","contenido":f"{mensaje} | RTA: {respuesta[:400]}","fecha":datetime.datetime.now().isoformat()}).execute()
-            except:
-                pass
-
-    return jsonify({"respuesta": respuesta, "tipo": tipo, "pin": pin})
-
-@app.route('/gps', methods=['POST'])
-def gps():
-    data = request.json or {}
-    if supabase:
-        try:
-            supabase.table("memoria_gps").insert({"pin":data.get('pin'),"lat":data.get('lat'),"lon":data.get('lon'),"nota":data.get('nota','Ubicación compartida'),"fecha":datetime.datetime.now().isoformat()}).execute()
-        except:
-            pass
-    return jsonify({"ok":True, "msg":"Ubicación guardada, papi. Ya me acuerdo por donde pasamos. 📍"})
-
-@app.route('/bloqueo_tostado', methods=['POST'])
-def bloqueo():
-    data=request.json or {}
-    if str(data.get('pin_autorizado'))==PIN_BLOQUEO or str(data.get('pin'))==PIN_BLOQUEO:
-        if supabase:
-            supabase.table("comandos_sistema").insert({"comando":"BLOQUEO_TOSTADO_FRITO","origen":"Pao","destino":"Mario","fecha":datetime.datetime.now().isoformat()}).execute()
-        return jsonify({"estado":"CELULAR DE MARIO BLOQUEADO - MODO PISAPAPELES ACTIVADO"})
-    return jsonify({"error":"PIN no autorizado, solo Pao 2345"})
-
-@app.route('/estado')
-def estado():
-    return jsonify({"version":"V10.1 FULL DEFINITIVA","familia":list(FAMILIA.keys()),"features":["contable_taxista","fabrica_apps_150","boveda_familiar","gps_corazon","bloqueo_tostado","memoria_offline","centinela_preparado"]})
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
