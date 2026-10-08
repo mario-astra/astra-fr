@@ -71,14 +71,17 @@ def gemini_conversa(usuario, mensaje, img_b64=None):
     )
     prompt = f"{instr}\n\n{mensaje}"
     
-    # Lista de fallback robusta para AI Studio
+    # Lista de fallback 2026 - Modelos vigentes
     MODELOS_FALLBACK = [
-        'gemini-2.5-flash',
-        'gemini-flash-latest',
         'gemini-2.0-flash',
-        'gemini-2.0-flash-lite',
-        'gemini-2.5-flash-lite'
-   ] 
+        'gemini-flash-latest',
+        'gemini-2.5-flash-lite',
+        'gemini-3-flash-preview',
+        'gemini-3.5-flash',
+        'gemini-3.5-flash-lite',
+        'gemini-3.8-flash',
+        'gemini-pro-latest'
+    ] 
    for m in MODELOS_FALLBACK:
         try:
             if img_b64:
