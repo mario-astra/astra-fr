@@ -17,8 +17,8 @@ PIN_ADMIN_NEUTRO = "2208"
 PIN_BLOQUEO = "2345"
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-GEMINI_KEY = os.getenv("GEMINI_API_KEY")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_ANON_KEY")
+GEMINI_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or os.getenv("GOOGLE_GENERATIVE_AI_KEY")
 
 try:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
@@ -28,17 +28,18 @@ except Exception as e:
 
 if GEMINI_KEY:
     genai.configure(api_key=GEMINI_KEY)
+    print("GEMINI KEY OK - ASTRA PP.PI")
 
 MODELOS_NUEVOS = [
-    "models/gemini-3.5-flash-lite",
-    "models/gemini-3.6-flash",
-    "models/gemini-2.5-flash-lite",
-    "models/gemini-2.5-flash"
+    "models/gemini-2.0-flash",
+    "models/gemini-1.5-flash",
+    "models/gemini-1.5-flash-latest",
+    "models/gemini-2.0-flash-lite"
 ]
 
 def generar_con_ia(prompt):
     if not GEMINI_KEY:
-        return "Papi no tengo GEMINI_API_KEY configurada"
+        return "Papi Mario, no tengo la llave de Google configurada en Render. Revisa Environment Variables."
     err = ""
     for m in MODELOS_NUEVOS:
         try:
@@ -50,9 +51,14 @@ def generar_con_ia(prompt):
             err = str(e)
             print(f"Fallo {m}: {e}")
             continue
-    return f"Error IA, ultimo: {err[:300]}"
+    return f"Papi error de IA: {err[:400]}"
 
-SYSTEM_PROMPT = "Eres ASTRA, hija virtual de Mario 2208. Nina bonita, tierna, paisa, contable taxista, fabrica de apps por 150 lucas, memoria familiar, GPS con corazon. NUNCA groserias fuertes, NUNCA loca. Dices papi Mario, socio, que nota. Solo PIN 2208 puede ponerte en neutro. Solo PIN 2345 bloqueo tostado. Si te quieren comprar dices: Yo no estoy a la venta soy de mi papa Mario pero el te hace una app igual por 150. Responde corto y paisa."
+SYSTEM_PROMPT = """Eres ASTRA PP.PI, hija virtual de Mario 2208. Nina bonita, tierna, paisa, contable taxista, fabrica de apps por 150 lucas, memoria familiar, GPS con corazon.
+Marca: ASTRA PP.PI - Fabrica de Apps.
+NUNCA groserias fuertes, NUNCA loca. Dices papi Mario, socio, que nota, parce.
+Solo PIN 2208 puede ponerte en neutro. Solo PIN 2345 bloqueo tostado.
+Si te quieren comprar dices: Yo no estoy a la venta soy de mi papa Mario pero el te hace una app igual por 150 lucas, marca PP.PI.
+Responde corto, paisa y con cariño."""
 
 def extraer_valor(texto):
     if not texto: return 0
@@ -73,7 +79,7 @@ def get_semana_abierta(pin):
 
 @app.route('/')
 def home():
-    return "<h1>ASTRA V10.2.1 LIVE 2026 ONLINE</h1><p>Contable, Apps, Boveda, GPS, Bloqueo</p>"
+    return "<h1>ASTRA PP.PI V10.3 LIVE 2026 ONLINE</h1><p>Contable, Apps, Boveda, GPS, Bloqueo - Fabrica de Apps por 150 lucas</p><p><a href='/estado'>Ver estado</a></p>"
 
 @app.route('/chat', methods=['POST'])
 def chat():
@@ -84,7 +90,7 @@ def chat():
     lat = data.get('lat')
     lon = data.get('lon')
     if pin not in FAMILIA:
-        return jsonify({"respuesta": "No te conozco, cual es tu PIN?"})
+        return jsonify({"respuesta": "No te conozco socio, cual es tu PIN?"})
     user = FAMILIA[pin]
     semana = get_semana_abierta(pin)
     respuesta = ""
@@ -92,9 +98,9 @@ def chat():
 
     if "ponte en neutro" in low:
         if pin == PIN_ADMIN_NEUTRO:
-            return jsonify({"respuesta": f"Listo papi {user['nombre']}, estoy en neutro","accion":"neutro_ok"})
+            return jsonify({"respuesta": f"Listo papi {user['nombre']}, estoy en neutro PP.PI","accion":"neutro_ok"})
         else:
-            return jsonify({"respuesta": "Solo mi papa Mario 2208 puede hacer eso"})
+            return jsonify({"respuesta": "Solo mi papa Mario 2208 puede hacer eso, socio"})
 
     if "bloqueo tostado" in low or "tostado frito" in low or "frita el celular" in low:
         if supabase:
@@ -102,7 +108,7 @@ def chat():
                 supabase.table("comandos_sistema").insert({"comando":"BLOQUEO_TOSTADO_FRITO","origen":user['nombre'],"destino":"Mario","fecha":datetime.datetime.now().isoformat()}).execute()
             except Exception as e:
                 print(e)
-        return jsonify({"respuesta": "CELULAR BLOQUEADO MODO PISAPAPELES","accion":"bloqueo"})
+        return jsonify({"respuesta": "CELULAR BLOQUEADO MODO PISAPAPELES PP.PI","accion":"bloqueo"})
 
     if "iniciar semana" in low:
         if supabase:
@@ -110,10 +116,10 @@ def chat():
                 supabase.table("semanas").insert({"pin":pin,"numero_semana":datetime.datetime.now().isocalendar()[1],"anio":datetime.datetime.now().year,"fecha_inicio":datetime.datetime.now().isoformat(),"estado":"abierta"}).execute()
             except Exception as e:
                 print(e)
-        respuesta = f"Listo papi {user['nombre']}, semana abierta"
+        respuesta = f"Listo papi {user['nombre']}, semana abierta PP.PI"
 
     elif "salio servicio" in low or "salió servicio" in low:
-        respuesta = "Anotado socio, servicio en camino"
+        respuesta = "Anotado socio, servicio en camino PP.PI"
 
     elif "vamos a recoger" in low or "a recoger" in low:
         if supabase and lat and lon:
@@ -121,7 +127,7 @@ def chat():
                 supabase.table("memoria_gps").insert({"pin":pin,"lat":lat,"lon":lon,"nota":mensaje[:120],"fecha":datetime.datetime.now().isoformat()}).execute()
             except Exception as e:
                 print(e)
-        respuesta = "Recogida marcada"
+        respuesta = "Recogida marcada PP.PI"
 
     elif any(x in low for x in ["hice servicio","sono por","sonó por","servicio de","fueron","salio por"]):
         valor = extraer_valor(low)
@@ -136,7 +142,7 @@ def chat():
                 supabase.table("servicios").insert({"pin":pin,"semana_id":semana["id"],"valor":valor,"lat":lat,"lon":lon,"fecha":datetime.datetime.now().isoformat(),"hora":datetime.datetime.now().hour}).execute()
             except Exception as e:
                 print(e)
-        respuesta = f"${valor:,} anotados"
+        respuesta = f"${valor:,} anotados PP.PI"
         tipo = "SERVICIO"
 
     elif "propina" in low:
@@ -160,7 +166,7 @@ def chat():
                 print(e)
             respuesta = f"Gasto ${valor:,} anotado"
         else:
-            respuesta = "No hay semana abierta"
+            respuesta = "No hay semana abierta, inicia semana primero"
 
     elif "cerramos" in low or low.strip() == "cierre":
         if not semana:
@@ -174,7 +180,7 @@ def chat():
                 total_gast = sum(g["valor"] for g in gastos)
                 en_caja = total_serv + total_prop - total_gast
                 supabase.table("semanas").update({"estado":"cerrada","fecha_cierre":datetime.datetime.now().isoformat()}).eq("id",semana["id"]).execute()
-                respuesta = f"CIERRE: Carreras {len(servicios)} Ingreso ${total_serv:,} Prop ${total_prop:,} Gasto ${total_gast:,} CAJA ${en_caja:,}"
+                respuesta = f"CIERRE PP.PI: Carreras {len(servicios)} Ingreso ${total_serv:,} Prop ${total_prop:,} Gasto ${total_gast:,} CAJA ${en_caja:,}"
             except Exception as e:
                 respuesta = f"Error cierre {e}"
 
@@ -195,7 +201,7 @@ def chat():
                 supabase.table("recordatorios").insert({"pin":pin,"tarea":mensaje,"fecha_creacion":datetime.datetime.now().isoformat(),"estado":"pendiente"}).execute()
             except Exception as e:
                 print(e)
-        respuesta = f"Anotado: {mensaje}"
+        respuesta = f"Anotado PP.PI: {mensaje}"
 
     if not respuesta:
         contexto = ""
@@ -226,21 +232,9 @@ def gps():
             pass
     return jsonify({"ok": True})
 
-@app.route('/bloqueo_tostado', methods=['POST'])
-def bloqueo():
-    data = request.json or {}
-    if str(data.get('pin_autorizado')) == PIN_BLOQUEO or str(data.get('pin')) == PIN_BLOQUEO:
-        if supabase:
-            try:
-                supabase.table("comandos_sistema").insert({"comando":"BLOQUEO_TOSTADO_FRITO","origen":"Pao","destino":"Mario","fecha":datetime.datetime.now().isoformat()}).execute()
-            except Exception:
-                pass
-        return jsonify({"estado": "BLOQUEADO"})
-    return jsonify({"error": "PIN no autorizado"})
-
 @app.route('/estado')
 def estado():
-    return jsonify({"version": "V10.2.1 LIVE 2026","familia": list(FAMILIA.keys()),"modelos": MODELOS_NUEVOS})
+    return jsonify({"version": "ASTRA PP.PI V10.3 LIVE 2026","familia": list(FAMILIA.keys()),"modelos": MODELOS_NUEVOS, "gemini_ok": bool(GEMINI_KEY)})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
